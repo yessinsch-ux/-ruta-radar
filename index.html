@@ -1,0 +1,2646 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Ruta Radar — Ibiza</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #F3F5F9;
+    --surface: #FFFFFF;
+    --line: #E6E9F0;
+    --ink: #10131C;
+    --muted: #6B7280;
+    --warn: #F5A623;
+    --alert: #FF7A45;
+    --danger: #EF4444;
+    --ok: #16B27A;
+    --route: #2F6FED;
+    --route-soft: rgba(47,111,237,0.10);
+    --shadow-sm: 0 1px 2px rgba(16,19,28,0.05), 0 1px 3px rgba(16,19,28,0.06);
+    --shadow-md: 0 4px 14px rgba(16,19,28,0.08), 0 2px 4px rgba(16,19,28,0.05);
+    --shadow-lg: 0 12px 32px rgba(16,19,28,0.14), 0 4px 10px rgba(16,19,28,0.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased;}
+
+  .app{position:relative; height:100vh; height:100dvh; overflow:hidden;}
+
+  #map{position:absolute; inset:0; z-index:0;}
+
+  .topOverlay{
+    position:absolute; top:0; left:0; right:0; z-index:500;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 10px 0;
+    display:flex; flex-direction:column; gap:6px;
+    max-width:100vw; overflow-x:hidden; box-sizing:border-box;
+  }
+  header{
+    padding:8px 12px;
+    background:var(--surface);
+    border-radius:14px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    box-shadow:var(--shadow-md);
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--warn); display:flex; align-items:center; gap:5px; font-weight:700;
+    white-space:nowrap;
+  }
+  .dot{width:5px;height:5px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 2px rgba(245,166,35,0.18);animation:pulse 1.8s ease-in-out infinite; flex-shrink:0;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+  h1{
+    font-family:'Manrope', sans-serif; font-weight:800; letter-spacing:-.01em;
+    font-size:17px; margin:2px 0 0; color:var(--ink);
+  }
+  h1 span{color:var(--muted); font-weight:500; font-size:12px; margin-left:2px;}
+
+  .langSel{
+    font-family:'Inter',sans-serif; font-size:12px; font-weight:600; color:var(--ink);
+    background:var(--bg); border:1px solid var(--line);
+    border-radius:10px; padding:6px 9px; flex-shrink:0;
+  }
+
+  .routePanel{
+    background:var(--surface); border-radius:14px;
+    padding:8px 10px 6px; box-shadow:var(--shadow-md);
+  }
+  .optionalHint{
+    font-family:'Inter',sans-serif; font-size:9.5px; font-weight:600; color:var(--route);
+    margin-bottom:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  .routeRow{display:flex; gap:5px; margin-bottom:5px;}
+  .routeRow:last-of-type{margin-bottom:0;}
+  .routeField{
+    flex:1; display:flex; align-items:center; gap:7px;
+    background:var(--bg); border:1px solid var(--line); border-radius:10px;
+    padding:7px 11px; min-width:0;
+  }
+  .routeField .ico{font-size:11px; opacity:.9; flex-shrink:0;}
+  .routeField input{
+    flex:1; min-width:0; background:none; border:none; outline:none; color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:500;
+  }
+  .routeField input::placeholder{color:#A1A8B5;}
+  .routeGoBtn{
+    background:var(--route); color:#fff; border:none; border-radius:10px;
+    font-family:'Inter',sans-serif; font-weight:700; font-size:14px;
+    padding:0 14px; cursor:pointer; flex-shrink:0; box-shadow:0 4px 12px rgba(47,111,237,0.35);
+  }
+  .routeGoBtn:active{transform:scale(0.96);}
+  .routeStatus{
+    font-family:'Inter',monospace; font-size:10px; color:var(--muted);
+    margin-top:3px; min-height:0; font-weight:500;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .routeStatus:empty{margin-top:0;}
+  .routeStatus.active{color:var(--route);}
+  .routeStatus.err{color:var(--danger);}
+  .clearRouteBtn{
+    background:var(--surface); border:1px solid var(--line); color:var(--muted);
+    border-radius:11px; font-size:13px; padding:0 12px; cursor:pointer; flex-shrink:0;
+    font-family:'Inter',sans-serif; font-weight:600;
+  }
+  .useLocBtn{
+    background:var(--route-soft); border:1px solid var(--route); color:var(--route);
+    border-radius:10px; font-size:15px; padding:0 12px; cursor:pointer; flex-shrink:0;
+    font-family:'Inter',sans-serif; font-weight:600;
+  }
+  .useLocBtn:active{transform:scale(0.94);}
+  .useLocBtn.active{background:var(--route); color:#fff;}
+
+  .suggestList{
+    display:none; position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:700;
+    background:var(--surface); border-radius:12px; box-shadow:var(--shadow-lg);
+    max-height:200px; overflow-y:auto; border:1px solid var(--line);
+  }
+  .suggestList.show{display:block;}
+  .suggestItem{
+    padding:10px 13px; font-family:'Inter',sans-serif; font-size:13px; color:var(--ink);
+    display:flex; align-items:center; gap:9px; cursor:pointer; border-bottom:1px solid var(--line);
+  }
+  .suggestItem:last-child{border-bottom:none;}
+  .suggestItem:active{background:var(--bg);}
+  .suggestItem .sIco{flex-shrink:0; font-size:14px; opacity:0.7;}
+  .suggestItem .sMain{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .suggestItem .sSub{font-size:11px; color:var(--muted); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:1px;}
+  .suggestItem .sText{min-width:0; flex:1;}
+
+  .settingsRow{display:flex; gap:6px; margin-top:6px; min-width:0;}
+  .distSettings{
+    display:flex; align-items:center; gap:4px; flex:1; min-width:0;
+    font-family:'Inter',sans-serif; font-size:10px; color:var(--muted); font-weight:600;
+  }
+  .distSettings span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:1; min-width:0;}
+  .distSettings select, .distSettings input{
+    background:var(--bg); color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:5px 6px; font-family:'Inter',sans-serif; font-size:11px; font-weight:600;
+    min-width:0; width:0; flex:1;
+  }
+
+  .leaflet-container{background:#EAEDF3; font-family:'Inter',sans-serif;}
+
+  .hud{
+    position:absolute; left:10px; right:10px; bottom:0; z-index:500;
+    background:var(--surface); border-radius:16px 16px 0 0;
+    padding:9px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    box-shadow:var(--shadow-lg);
+    max-width:calc(100vw - 20px); overflow-x:hidden; box-sizing:border-box;
+  }
+  .nearest{
+    display:flex; align-items:center; gap:10px;
+    padding:7px 10px; border-radius:13px;
+    background:var(--bg); border:1px solid var(--line);
+    margin-bottom:7px;
+    transition: background .25s, border-color .25s, box-shadow .25s;
+  }
+  .nearestIcon{
+    position:relative; width:42px; height:42px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    font-size:18px; background:var(--surface); box-shadow:var(--shadow-sm);
+  }
+  .nearestIcon::before{
+    content:''; position:absolute; inset:-4px; border-radius:50%;
+    background: conic-gradient(from 0deg, transparent 0%, rgba(47,111,237,0.35) 18%, transparent 40%);
+    animation: radarSweep 2.4s linear infinite;
+    opacity:0.7;
+  }
+  .nearest.far .nearestIcon::before{ background: conic-gradient(from 0deg, transparent 0%, rgba(245,166,35,0.5) 18%, transparent 40%); animation-duration:1.4s; }
+  .nearest.near .nearestIcon::before{ background: conic-gradient(from 0deg, transparent 0%, rgba(239,68,68,0.6) 18%, transparent 40%); animation-duration:0.8s; }
+  .nearest.empty .nearestIcon::before{ display:none; }
+  @keyframes radarSweep{ to{ transform: rotate(360deg); } }
+  .dist{
+    font-family:'Manrope', sans-serif; font-weight:800; font-size:24px;
+    color:var(--warn); min-width:56px; text-align:center; line-height:1; flex-shrink:0;
+  }
+  .dist small{display:block; font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--muted); font-weight:500; margin-top:2px; letter-spacing:.05em; text-transform:uppercase;}
+  .nearest .info{flex:1; min-width:0;}
+  .nearest .info .type{font-size:10px; color:var(--alert); font-family:'JetBrains Mono',monospace; letter-spacing:.04em; text-transform:uppercase; font-weight:700;}
+  .nearest .info .desc{font-size:13.5px; margin-top:1px; color:var(--ink); font-weight:600; line-height:1.25; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;}
+  .nearest.empty .dist{color:#C2C8D2;}
+  .nearest.far{background:#FFF7EA; border-color:#F5DBA8;}
+  .nearest.far .dist{color:var(--warn);}
+  .nearest.near{background:#FEECEC; border-color:#F5B8B8; box-shadow:0 0 0 3px rgba(239,68,68,0.08);}
+  .nearest.near .dist{color:var(--danger);}
+
+  .bigTrackBtn{
+    display:block; width:100%; font-family:'Manrope',sans-serif; font-weight:800; font-size:14.5px;
+    padding:12px 14px; border-radius:13px; border:none; margin-bottom:7px;
+    background:var(--route); color:#fff; cursor:pointer;
+    box-shadow:0 6px 18px rgba(47,111,237,0.35);
+  }
+  .bigTrackBtn:active{transform:scale(0.98);}
+  .bigTrackBtn.on{background:var(--ok); box-shadow:0 6px 18px rgba(22,178,122,0.35);}
+
+  .controls{display:flex; gap:7px; margin-bottom:7px;}
+  #voiceBtn{background:#FEECEC; color:var(--danger); border-color:#F5B8B8;}
+  #voiceBtn.on{background:#E7F9F1; color:var(--ok); border-color:#B9EDD5;}
+  .secondaryBtn{background:#F0EBFF; color:#6D3FD4; border-color:#D5C6F5; font-weight:700;}
+  button{
+    flex:1; font-family:'Inter',sans-serif; font-weight:700; font-size:12px;
+    padding:9px 8px; border-radius:11px; border:1px solid var(--line);
+    background:var(--surface); color:var(--ink); cursor:pointer; box-shadow:var(--shadow-sm);
+  }
+  button.primary{background:var(--route); color:#fff; border-color:var(--route); box-shadow:0 4px 12px rgba(47,111,237,0.3);}
+  button:active{transform:scale(0.97);}
+  button.on{background:var(--ok); color:#fff; border-color:var(--ok); box-shadow:0 4px 12px rgba(22,178,122,0.3);}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+
+  .legend{
+    display:flex; flex-wrap:wrap; gap:3px 10px;
+    font-size:9.5px; color:var(--muted); font-weight:600;
+  }
+  .legend div{display:flex; align-items:center; gap:4px;}
+  .legend .sw{width:7px;height:7px;border-radius:50%; flex-shrink:0;}
+
+  .routeBadge{
+    position:absolute; z-index:400;
+    background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    padding:7px 11px; font-size:11px; color:var(--route); font-weight:700;
+    display:none; box-shadow:var(--shadow-md);
+  }
+  .routeBadge.show{display:none;}
+
+  .toast{
+    position:absolute; left:16px; right:16px; bottom:220px; z-index:900;
+    background:var(--surface); color:var(--ink); padding:12px 15px; border-radius:14px;
+    font-weight:600; font-size:13px; box-shadow:var(--shadow-lg);
+    transform:translateY(20px); opacity:0; pointer-events:none;
+    transition:all .35s ease; border-left:4px solid var(--alert);
+  }
+  .toast.show{transform:translateY(0); opacity:1;}
+  .toast.toastFar{border-left-color:var(--warn);}
+
+  .alertBanner{
+    position:absolute; top:0; left:0; right:0; z-index:950;
+    color:#fff; padding:18px 18px 16px; text-align:center;
+    transform:translateY(-100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+    box-shadow:var(--shadow-lg);
+  }
+  .alertBanner.tierFar{background:linear-gradient(135deg, var(--warn), #E8941A);}
+  .alertBanner.tierNear{background:linear-gradient(135deg, var(--danger), #D63333);}
+  .alertBanner.show{transform:translateY(0);}
+  .alertBanner .icon{font-size:32px; line-height:1;}
+  .alertBanner.tierNear .icon{animation:shake 0.5s ease-in-out infinite;}
+  @keyframes shake{0%,100%{transform:rotate(0deg);}25%{transform:rotate(-6deg);}75%{transform:rotate(6deg);}}
+  .alertBanner .txt{font-family:'Manrope',sans-serif; font-weight:800; font-size:18px; letter-spacing:-.01em; margin-top:5px;}
+  .alertBanner .sub{font-size:13px; margin-top:3px; opacity:.95; font-weight:500;}
+
+  .flashOverlay{
+    position:absolute; inset:0; z-index:940; pointer-events:none;
+    background:var(--danger); opacity:0;
+  }
+  .flashOverlay.flash{animation:flashAnim 0.6s ease-out;}
+  @keyframes flashAnim{0%{opacity:.25;}100%{opacity:0;}}
+
+  .note{
+    font-family:'JetBrains Mono',monospace; font-size:8.5px; color:#A1A8B5;
+    text-align:center; padding:6px 0 0; letter-spacing:.02em;
+  }
+
+  .marker-pin{
+    display:flex; align-items:center; justify-content:center;
+    width:34px; height:34px; border-radius:50%;
+    background:#fff; box-shadow:var(--shadow-md);
+    border:3px solid var(--alert);
+    transition: opacity .25s, transform .2s;
+  }
+  .marker-pin.dimmed{opacity:0.35;}
+  .marker-pin span{font-size:15px;}
+  .marker-blitzer{border-color:var(--alert);}
+  .marker-baustelle{border-color:var(--warn);}
+  .marker-unfall{border-color:#ef4444;}
+  .marker-sperre{border-color:#a78bfa;}
+
+  .marker-pin.pulseFar{ animation: pulseFar 1.4s ease-in-out infinite; }
+  @keyframes pulseFar{
+    0%,100%{ box-shadow:var(--shadow-md), 0 0 0 0 rgba(245,166,35,.55); }
+    50%{ box-shadow:var(--shadow-md), 0 0 0 10px rgba(245,166,35,0); }
+  }
+  .marker-pin.pulseNear{ animation: pulseNear 0.9s ease-in-out infinite; }
+  @keyframes pulseNear{
+    0%,100%{ box-shadow:var(--shadow-md), 0 0 0 0 rgba(239,68,68,.6); }
+    50%{ box-shadow:var(--shadow-md), 0 0 0 13px rgba(239,68,68,0); }
+  }
+
+  .onboarding{
+    position:fixed; inset:0; z-index:2000;
+    background:linear-gradient(160deg, #2F6FED 0%, #1B4FC7 100%);
+    display:flex; align-items:center; justify-content:center;
+    padding:16px 16px 90px; /* unten extra Platz, falls der Hoster einen Balken einblendet */
+    overflow-y:auto;        /* falls der Bildschirm klein ist, laesst sich scrollen */
+    -webkit-overflow-scrolling:touch;
+  }
+  .onboarding.hide{display:none;}
+  .onboardCard{
+    background:var(--surface); border-radius:22px; padding:22px 20px 20px;
+    width:100%; max-width:380px; box-shadow:var(--shadow-lg); text-align:center;
+    margin:auto;
+  }
+  .onboardIcon{
+    width:52px; height:52px; border-radius:50%; margin:0 auto 10px;
+    background:var(--route-soft); display:flex; align-items:center; justify-content:center;
+    font-size:25px;
+  }
+  .onboardCard h2{
+    font-family:'Manrope',sans-serif; font-weight:800; font-size:22px; margin:0 0 5px; color:var(--ink);
+  }
+  .onboardCard p{
+    font-size:13.5px; color:var(--muted); margin:0 0 14px; font-weight:500; line-height:1.35;
+  }
+  .onboardCard label{
+    display:block; text-align:left; font-size:12px; font-weight:700; color:var(--ink);
+    margin:0 0 5px;
+  }
+  .onboardCard input, .onboardCard select{
+    width:100%; padding:11px 13px; border-radius:12px; border:1.5px solid var(--line);
+    font-family:'Inter',sans-serif; font-size:15px; font-weight:500; color:var(--ink);
+    background:var(--bg); margin-bottom:12px; outline:none;
+  }
+  .onboardCard input:focus, .onboardCard select:focus{border-color:var(--route);}
+  #obStartBtn{
+    display:block; width:100%; font-family:'Manrope',sans-serif; font-weight:800; font-size:16px;
+    padding:15px 14px; border-radius:14px; border:none; margin-top:4px;
+    background:var(--route); color:#fff; cursor:pointer;
+    box-shadow:0 8px 20px rgba(47,111,237,0.35);
+  }
+  #obStartBtn:active{transform:scale(0.98);}
+  #obHint{
+    font-size:11px; color:#A1A8B5; margin-top:14px; line-height:1.4; font-weight:500;
+  }
+
+  /* Lage-Uebersicht auf dem Startbildschirm */
+  .obStatus{
+    background:var(--bg); border:1px solid var(--line); border-radius:14px;
+    padding:11px 12px 10px; margin:0 0 14px;
+    animation: statusIn .5s cubic-bezier(.34,1.4,.64,1);
+  }
+  @keyframes statusIn{
+    0%{ opacity:0; transform:translateY(10px) scale(.97); }
+    100%{ opacity:1; transform:none; }
+  }
+  .obStatusHead{
+    font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.11em;
+    text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:10px;
+  }
+  .obStatusRow{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .obStatChip{
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    background:var(--surface); border-radius:12px; padding:9px 12px; min-width:64px;
+    box-shadow:var(--shadow-sm);
+  }
+  .obStatChip .n{
+    font-family:'Manrope',sans-serif; font-weight:800; font-size:20px; line-height:1; color:var(--ink);
+  }
+  .obStatChip .l{ font-size:9.5px; color:var(--muted); font-weight:600; text-align:center; }
+  .obStatChip.warn .n{ color:var(--warn); }
+  .obStatChip.alert .n{ color:var(--alert); }
+  .obStatChip.danger .n{ color:var(--danger); }
+  .obStatClear{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    font-size:13.5px; font-weight:700; color:var(--ok); padding:6px 0;
+  }
+
+  /* ---- Navigations-Modus (aktiv, wenn Route + Standort-Verfolgung laufen) ---- */
+  .navBanner, .navNext, .navSideBtns, .navBottomBar{ display:none; }
+  .app.navMode .navBanner, .app.navMode .navNext, .app.navMode .navSideBtns, .app.navMode .navBottomBar{ display:flex; }
+  .app.navMode .topOverlay, .app.navMode .legend{ display:none; }
+  .app.navMode .hud{ display:none; }
+  /* Dunkle Navi-Karte einen Tick aufhellen und blaeulich einfaerben - Gebaeude bleiben
+     erkennbar, wirken aber ruhig im Hintergrund, wie bei einem Auto-Navi bei Nacht. */
+  .app.navMode #map{ filter: brightness(1.28) saturate(1.15) hue-rotate(-8deg); }
+  .app.navMode .leaflet-container{ background:#101826; }
+
+  .navBanner{
+    position:absolute; top:0; left:0; right:0; z-index:600;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 18px;
+    background:linear-gradient(160deg, #1D9A5C, #147A46);
+    align-items:center; gap:14px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.25);
+  }
+  .navArrow{ font-size:34px; color:#fff; flex-shrink:0; line-height:1; }
+  .navText{min-width:0;}
+  .navLabel{ font-family:'Inter',sans-serif; font-size:13px; color:rgba(255,255,255,0.85); font-weight:600;}
+  .navStreet{ font-family:'Manrope',sans-serif; font-size:24px; font-weight:800; color:#fff; line-height:1.1; margin-top:2px;}
+
+  .navNext{
+    position:absolute; z-index:590; top:128px; left:16px;
+    background:rgba(20,60,40,0.92); color:#fff; border-radius:14px;
+    padding:9px 14px; align-items:center; gap:8px;
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:600;
+    box-shadow:0 4px 12px rgba(0,0,0,0.25);
+  }
+  #navNextArrow{font-size:16px;}
+
+  .navSideBtns{
+    position:absolute; z-index:590; right:14px; top:220px;
+    flex-direction:column; gap:12px;
+  }
+  .navRoundBtn{
+    width:48px; height:48px; border-radius:50%; border:none;
+    background:rgba(20,20,25,0.72); color:#fff; font-size:19px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 12px rgba(0,0,0,0.3); cursor:pointer;
+  }
+  .navRoundBtn:active{transform:scale(0.94);}
+  .navRoundBtn.muted{opacity:0.55;}
+
+  .navBottomBar{
+    position:absolute; left:0; right:0; bottom:0; z-index:600;
+    background:rgba(15,15,18,0.94);
+    padding:14px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+    align-items:center; justify-content:space-between;
+  }
+  .navEtaTime{ font-family:'Manrope',sans-serif; font-weight:800; font-size:24px; color:var(--ok);}
+  .navEtaDist{ font-family:'Inter',sans-serif; font-size:12.5px; color:#B7BCC6; font-weight:500; margin-top:2px;}
+  .navExitBtn{
+    width:46px; height:46px; border-radius:50%; border:none;
+    background:var(--danger); color:#fff; font-size:18px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 4px 12px rgba(239,68,68,0.4);
+  }
+  .navExitBtn:active{transform:scale(0.94);}
+
+  .reportBtn{background:rgba(245,166,35,0.92);}
+
+  /* Schnell-Meldeknoepfe: ein Tipp genuegt, mit deutlicher Rueckmeldung */
+  .quickBtn{
+    background:rgba(245,166,35,0.94); font-size:21px;
+    border:2px solid rgba(255,255,255,0.35);
+  }
+  .quickBtn:active{transform:scale(0.86);}
+  .quickBtn.confirmed{
+    animation: quickConfirm 0.55s ease-out;
+  }
+  @keyframes quickConfirm{
+    0%{ transform:scale(1); background:rgba(245,166,35,0.94); box-shadow:0 0 0 0 rgba(22,178,122,0.9); }
+    25%{ transform:scale(1.28); background:var(--ok); box-shadow:0 0 0 14px rgba(22,178,122,0); }
+    100%{ transform:scale(1); background:rgba(245,166,35,0.94); box-shadow:0 0 0 0 rgba(22,178,122,0); }
+  }
+
+  /* Kurzer gruener Vollbild-Blitz als Bestaetigung, dass die Meldung angekommen ist */
+  .confirmFlash{
+    position:absolute; inset:0; z-index:1100; pointer-events:none;
+    background:var(--ok); opacity:0;
+  }
+  .confirmFlash.flash{ animation: confirmFlashAnim 0.5s ease-out; }
+  @keyframes confirmFlashAnim{ 0%{opacity:0.3;} 100%{opacity:0;} }
+
+  /* Kurzer heller Blitz, wenn eine neue Warnung auftaucht - faellt auch im Augenwinkel auf */
+  .whiteFlash{
+    position:absolute; inset:0; z-index:1150; pointer-events:none;
+    background:#fff; opacity:0;
+  }
+  .whiteFlash.flash{ animation: whiteFlashAnim 0.42s ease-out; }
+  @keyframes whiteFlashAnim{
+    0%{opacity:0;} 18%{opacity:0.72;} 40%{opacity:0.15;} 60%{opacity:0.5;} 100%{opacity:0;}
+  }
+
+  /* Mikrofon-Knopf fuer freihaendiges Melden (wichtig auf dem Motorrad) */
+  .micBtn{ background:rgba(47,111,237,0.92); }
+
+  /* Zentrieren-Knopf: weiss mit dunklem Pfeil, wie bei Google Maps */
+  .recenterBtn{
+    background:#fff; color:#1A1D24; font-size:20px;
+    transform: rotate(-45deg);
+    border:1px solid rgba(0,0,0,0.08);
+  }
+  .recenterBtn:active{ transform: rotate(-45deg) scale(0.88); }
+  .recenterBtn.following{ background:var(--route); color:#fff; }
+  .micBtn.listening{
+    background:var(--danger);
+    animation: micPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes micPulse{
+    0%,100%{ box-shadow:0 4px 12px rgba(0,0,0,.3), 0 0 0 0 rgba(239,68,68,.75); }
+    50%{ box-shadow:0 4px 12px rgba(0,0,0,.3), 0 0 0 14px rgba(239,68,68,0); }
+  }
+
+  /* --- Lebendigere Bedienung: alle Knoepfe reagieren spuerbar auf Beruehrung --- */
+  button{ transition: transform .12s cubic-bezier(.34,1.56,.64,1), box-shadow .2s, background .2s; }
+  .bigTrackBtn{ transition: transform .12s cubic-bezier(.34,1.56,.64,1), box-shadow .25s, background .25s; }
+  .bigTrackBtn:active{ transform:scale(0.955); }
+  .routeGoBtn:active{ transform:scale(0.9); }
+  .navRoundBtn{ transition: transform .12s cubic-bezier(.34,1.56,.64,1), background .2s; }
+  .navRoundBtn:active{ transform:scale(0.88); }
+  .reportOpt{ transition: transform .12s cubic-bezier(.34,1.56,.64,1), background .2s; }
+  .suggestItem{ transition: background .15s; }
+
+  /* Hauptknopf atmet leicht, solange noch nicht gestartet wurde - lenkt den Blick dorthin */
+  .bigTrackBtn:not(.on){ animation: breathe 2.6s ease-in-out infinite; }
+  @keyframes breathe{
+    0%,100%{ box-shadow:0 6px 18px rgba(47,111,237,0.35), 0 0 0 0 rgba(47,111,237,0.35); }
+    50%{ box-shadow:0 6px 22px rgba(47,111,237,0.45), 0 0 0 8px rgba(47,111,237,0); }
+  }
+
+  /* Der "Los geht's"-Pfeil pulsiert, sobald eine Route bereitsteht */
+  .routeGoBtn.ready{ animation: readyPulse 1.6s ease-in-out infinite; }
+  @keyframes readyPulse{
+    0%,100%{ transform:scale(1); box-shadow:0 4px 12px rgba(47,111,237,0.35); }
+    50%{ transform:scale(1.06); box-shadow:0 6px 18px rgba(47,111,237,0.55); }
+  }
+
+  /* Neue Warnkarte gleitet sanft ein, statt hart umzuspringen */
+  .nearest{ transition: background .3s, border-color .3s, box-shadow .3s, transform .25s; }
+  .nearest.near{ transform: scale(1.015); }
+
+  /* ---- Kurze Einweisung beim Losfahren ---- */
+  .tutorialOverlay{
+    display:none; position:absolute; inset:0; z-index:1400; pointer-events:none;
+    background:rgba(8,10,14,0.55);
+  }
+  .tutorialOverlay.show{ display:block; }
+  .tutorialSpotlight{
+    position:absolute; border-radius:50%;
+    box-shadow:0 0 0 9999px rgba(8,10,14,0.55), 0 0 0 4px #fff, 0 0 28px 6px rgba(255,255,255,0.75);
+    background:transparent;
+    transition: all .35s cubic-bezier(.4,0,.2,1);
+    opacity:0;
+  }
+  .tutorialSpotlight.on{ opacity:1; animation: spotPulse 1.1s ease-in-out infinite; }
+  @keyframes spotPulse{
+    0%,100%{ box-shadow:0 0 0 9999px rgba(8,10,14,0.55), 0 0 0 4px #fff, 0 0 24px 4px rgba(255,255,255,0.6); }
+    50%{ box-shadow:0 0 0 9999px rgba(8,10,14,0.55), 0 0 0 6px #fff, 0 0 36px 10px rgba(255,255,255,0.9); }
+  }
+  .tutorialBubble{
+    position:absolute; left:16px; right:96px; top:50%; transform:translateY(-50%);
+    background:var(--surface); border-radius:18px; padding:16px 18px;
+    box-shadow:var(--shadow-lg); display:flex; align-items:center; gap:13px;
+    transition: opacity .3s;
+  }
+  .tutIcon{ font-size:28px; flex-shrink:0; }
+  .tutText{
+    font-family:'Inter',sans-serif; font-size:14.5px; font-weight:600;
+    color:var(--ink); line-height:1.35;
+  }
+  .reportSheet{
+    display:none; position:absolute; inset:0; z-index:1200;
+    background:rgba(10,12,16,0.55); align-items:flex-end; justify-content:center;
+    padding:18px;
+  }
+  .reportSheet.show{display:flex;}
+  .reportCard{
+    background:var(--surface); border-radius:22px; padding:20px 18px 16px;
+    width:100%; max-width:420px; box-shadow:var(--shadow-lg);
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .reportTitle{
+    font-family:'Manrope',sans-serif; font-weight:800; font-size:18px;
+    text-align:center; margin-bottom:16px; color:var(--ink);
+  }
+  .reportGrid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;}
+  .reportOpt{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:16px 8px; border-radius:16px; border:1.5px solid var(--line);
+    background:var(--bg); cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .reportOpt span{font-size:26px; line-height:1;}
+  .reportOpt em{font-style:normal; font-size:13px; font-weight:700; color:var(--ink);}
+  .reportOpt:active{transform:scale(0.96); background:#E9EEF8;}
+  .reportCancel{
+    width:100%; padding:13px; border-radius:14px; border:none;
+    background:var(--bg); color:var(--muted); font-weight:700; font-size:14px;
+    font-family:'Inter',sans-serif; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div class="onboarding" id="onboarding">
+  <div class="onboardCard">
+    <div class="onboardIcon">📡</div>
+    <h2 id="obTitle">Ruta Radar</h2>
+    <p id="obSubtitle">Warnungen in Echtzeit, während du unterwegs bist.</p>
+
+    <!-- Kurze Lage-Uebersicht: was ist gerade auf der Insel los? -->
+    <div class="obStatus" id="obStatus">
+      <div class="obStatusHead" id="obStatusHead">Lage auf Ibiza</div>
+      <div class="obStatusRow" id="obStatusRow"></div>
+    </div>
+
+    <label id="obNameLabel" for="obNameInput">Dein Name</label>
+    <input type="text" id="obNameInput" placeholder="z. B. Max">
+
+    <label id="obLangLabel">Deine Sprache</label>
+    <select id="obLangSel">
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="en">🇬🇧 English</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+    </select>
+
+    <button id="obStartBtn">📍 Standort aktivieren &amp; starten</button>
+    <div id="obHint">Dein Standort wird nur genutzt, während diese Seite geöffnet ist.</div>
+  </div>
+</div>
+<div class="app">
+  <div id="map"></div>
+  <div class="flashOverlay" id="flashOverlay"></div>
+  <div class="confirmFlash" id="confirmFlash"></div>
+  <div class="whiteFlash" id="whiteFlash"></div>
+
+  <!-- Kurze Einweisung beim Losfahren: zeigt einmal, wofuer die Knoepfe rechts da sind -->
+  <div class="tutorialOverlay" id="tutorialOverlay">
+    <div class="tutorialSpotlight" id="tutorialSpotlight"></div>
+    <div class="tutorialBubble" id="tutorialBubble">
+      <div class="tutIcon" id="tutIcon">👋</div>
+      <div class="tutText" id="tutText"></div>
+    </div>
+  </div>
+  <div class="alertBanner" id="alertBanner">
+    <div class="icon" id="bannerIcon">🚧</div>
+    <div class="txt" id="bannerTxt">BAUSTELLE IN 100M</div>
+    <div class="sub" id="bannerSub">Mobiler Blitzer auf der Av. Isidor Macabich</div>
+  </div>
+
+  <div class="topOverlay">
+    <header>
+      <div>
+        <div class="eyebrow"><span class="dot"></span><span id="demoLabel">DEMO · Beispieldaten</span></div>
+        <h1 id="title">Ruta Radar <span id="subtitle">Ibiza · Warnungen in der Nähe</span></h1>
+      </div>
+      <select class="langSel" id="langSel">
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="en">🇬🇧 English</option>
+        <option value="es">🇪🇸 Español</option>
+        <option value="it">🇮🇹 Italiano</option>
+        <option value="nl">🇳🇱 Nederlands</option>
+      </select>
+    </header>
+
+    <div class="routePanel">
+      <div class="optionalHint" id="optionalHint">Kein Ziel? Nicht nötig — einfach unten "Standort verfolgen" drücken.</div>
+      <div class="routeRow" style="position:relative;">
+        <div class="routeField">
+          <span class="ico">🟢</span>
+          <input type="text" id="fromInput" placeholder="Von …" autocomplete="off">
+        </div>
+        <button class="useLocBtn" id="useLocBtn" type="button">📍</button>
+        <div class="suggestList" id="fromSuggest"></div>
+      </div>
+      <div class="routeRow" style="position:relative;">
+        <div class="routeField">
+          <span class="ico">🏁</span>
+          <input type="text" id="toInput" placeholder="Nach …" autocomplete="off">
+        </div>
+        <button class="routeGoBtn" id="routeGoBtn">→</button>
+        <button class="clearRouteBtn" id="clearRouteBtn" style="display:none;">✕</button>
+        <div class="suggestList" id="toSuggest"></div>
+      </div>
+      <div class="routeStatus" id="routeStatus"></div>
+      <div class="settingsRow">
+        <div class="distSettings">
+          <span id="earlyLabel">Vorwarnung ab</span>
+          <select id="earlyDistSel">
+            <option value="400">400 m</option>
+            <option value="600">600 m</option>
+            <option value="800" selected>800 m</option>
+            <option value="1000">1000 m</option>
+            <option value="1500">1500 m</option>
+          </select>
+        </div>
+        <div class="distSettings">
+          <span id="nameLabel">Name</span>
+          <input type="text" id="nameInput" placeholder="z. B. Max">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="routeBadge" id="routeBadge">0 ⚠ auf deiner Route</div>
+  <div class="toast" id="toast"></div>
+
+  <!-- Navigations-Modus: erscheint nur, wenn Route + Standort-Verfolgung aktiv sind -->
+  <div class="navBanner" id="navBanner">
+    <div class="navArrow" id="navArrow">⬆</div>
+    <div class="navText">
+      <div class="navLabel" id="navLabel">Richtung</div>
+      <div class="navStreet" id="navStreet">–</div>
+    </div>
+  </div>
+  <div class="navNext" id="navNext">
+    <span id="navNextLabel">Dann</span> <span id="navNextArrow">↩</span>
+  </div>
+
+  <div class="navSideBtns" id="navSideBtns">
+    <button class="navRoundBtn recenterBtn" id="navRecenterBtn">➤</button>
+    <button class="navRoundBtn" id="navMuteBtn">🔊</button>
+    <button class="navRoundBtn" id="navLayerBtn">🛰️</button>
+    <button class="navRoundBtn quickBtn" id="quickBlitzer" data-type="blitzer">📷</button>
+    <button class="navRoundBtn quickBtn" id="quickBaustelle" data-type="baustelle">🚧</button>
+    <button class="navRoundBtn quickBtn" id="quickUnfall" data-type="unfall">⚠️</button>
+    <button class="navRoundBtn micBtn" id="navMicBtn">🎤</button>
+  </div>
+
+  <!-- Auswahlfenster zum Melden einer eigenen Beobachtung -->
+  <div class="reportSheet" id="reportSheet">
+    <div class="reportCard">
+      <div class="reportTitle" id="reportTitle">Was siehst du hier?</div>
+      <div class="reportGrid">
+        <button class="reportOpt" data-type="blitzer"><span>📷</span><em id="ropt1">Blitzer</em></button>
+        <button class="reportOpt" data-type="baustelle"><span>🚧</span><em id="ropt2">Baustelle</em></button>
+        <button class="reportOpt" data-type="unfall"><span>⚠️</span><em id="ropt3">Unfall</em></button>
+        <button class="reportOpt" data-type="sperre"><span>⛔</span><em id="ropt4">Sperrung</em></button>
+      </div>
+      <button class="reportCancel" id="reportCancel">Abbrechen</button>
+    </div>
+  </div>
+
+  <div class="navBottomBar" id="navBottomBar">
+    <div class="navEta">
+      <div class="navEtaTime" id="navEtaTime">– min</div>
+      <div class="navEtaDist" id="navEtaDist">– km</div>
+    </div>
+    <button class="navExitBtn" id="navExitBtn">✕</button>
+  </div>
+
+
+  <div class="hud">
+    <div class="nearest empty" id="nearest">
+      <div class="nearestIcon" id="nearestIcon">📡</div>
+      <div class="dist" id="nearestDist">–<small id="nearestUnit">Meter</small></div>
+      <div class="info">
+        <div class="type" id="nearestType">–</div>
+        <div class="desc" id="nearestDesc">–</div>
+      </div>
+    </div>
+    <button class="bigTrackBtn" id="trackBtn">📍 Standort verfolgen</button>
+    <div class="controls">
+      <button id="voiceBtn" class="on">🔊 Ton: An</button>
+      <button id="demoBtn" class="secondaryBtn">▶ Test-Fahrt</button>
+    </div>
+    <div class="legend" id="legend">
+      <div><span class="sw" style="background:var(--alert)"></span><span id="lg1">Blitzer</span></div>
+      <div><span class="sw" style="background:var(--warn)"></span><span id="lg2">Baustelle</span></div>
+      <div><span class="sw" style="background:#ef4444"></span><span id="lg3">Unfall</span></div>
+      <div><span class="sw" style="background:#a78bfa"></span><span id="lg4">Sperrung</span></div>
+    </div>
+    <div class="note" id="footerNote">Kartendaten: OpenStreetMap-Mitwirkende · Sprachausgabe: Browser-TTS</div>
+  </div>
+</div>
+
+<script>
+// ---- UI-Texte je Sprache ----
+const ui = {
+  de: {
+    demoLabel: "DEMO · Beispieldaten",
+    subtitle: "Ibiza · Warnungen in der Nähe",
+    legend: ["Blitzer","Baustelle","Unfall","Sperrung"],
+    unit: "Meter",
+    noLocationType: "Kein Standort",
+    noLocationDesc: "Route eingeben oder „Standort verfolgen“ tippen.",
+    trackStart: "📍 Standort verfolgen", trackStop: "⏸ Verfolgung läuft – antippen zum Stoppen",
+    voiceOn: "🔊 Ton: An", voiceOff: "🔇 Ton: Aus",
+    demoStart: "▶ Fahrt simulieren", demoStop: "⏹ Demo stoppen",
+    footer: "Kartendaten: OpenStreetMap-Mitwirkende · Sprachausgabe: Browser-TTS (Deutsch)",
+    earlyLead: "pass auf, in {d} Metern kommt:", nearLead: "gleich in {d} Metern:",
+    junctionLead: "Du könntest in {d} Metern {dir} auf die {s} abbiegen, um sie zu umfahren.",
+    dirWords: {left:"links", right:"rechts", straight:"geradeaus", "slight left":"leicht links", "slight right":"leicht rechts", "sharp left":"scharf links", "sharp right":"scharf rechts", uturn:"wendend"},
+    greetWithName: "Hey {name}", greetPlain: "Hey",
+    navToward: "In {d}m Richtung",
+    myLocationLabel: "📍 Mein Standort", locating: "Suche Standort …", locationErr: "Standort nicht verfügbar.",
+    turnSoon: "In {d} Metern {dir} abbiegen, auf die {s}.", turnNow: "Jetzt {dir} abbiegen.",
+    roundaboutSoon: "Achtung, in {d} Metern kommt ein Kreisverkehr — dort die {n}. Ausfahrt nehmen, Richtung {s}.", roundaboutNow: "Jetzt im Kreisverkehr die {n}. Ausfahrt.",
+    roundaboutSoonNoExit: "Achtung, in {d} Metern kommt ein Kreisverkehr, Richtung {s}.", roundaboutNowNoExit: "Jetzt in den Kreisverkehr.",
+    easyToMissHint: "Achtung, die ist leicht zu übersehen.", navRoundaboutLabel: "In {d}m Kreisverkehr, {n}. Ausfahrt",
+    searchingSuggest: "Suche …", noSuggest: "Keine Treffer gefunden.",
+    navStartSpeech: "los geht's!", navStartStreet: "Fahr los Richtung {s}.", navStartWarnings: "Ich sag dir Bescheid, du hast {n} Warnungen auf dem Weg.",
+    navStartList: "Auf deiner Route liegen: {list}. Ich sag dir rechtzeitig Bescheid.", navStartClear: "Auf deiner Route ist gerade alles frei — ich meld mich, falls was reinkommt.",
+    statusNext: "Alles ruhig soweit. Als Nächstes kommt in etwa {d} Metern: {t}.", statusClear: "Weiterhin alles frei. Noch {km} Kilometer, etwa {min} Minuten.",
+    reportTitle: "Was siehst du hier?", reportCancel: "Abbrechen", reportedByYou: "von dir gemeldet", reportThanks: "Danke! {t} gemeldet.",
+    reportSpoken: "Alles klar, {t} gespeichert. Danke!",
+    micOn: "Sprachbefehle an — sag z. B. 'Blitzer' oder 'Baustelle'.", micOff: "Sprachbefehle aus.", micOnSpoken: "Ich höre zu. Sag einfach Blitzer, Baustelle oder Unfall.", micUnsupported: "Spracherkennung wird auf diesem Gerät nicht unterstützt.",
+    followOn: "Nah — Blick nach vorn.", followOff: "Übersicht an.", viewNormal: "Standardansicht.", viewWide: "Weiter Überblick.",
+    tutReport: "Siehst du was? Ein Tipp hier hilft allen anderen.", tutReportSpeech: "Ich versorg dich unterwegs mit allem, was ich weiß. Und wenn du magst, hilf kurz mit: Siehst du unterwegs was, tipp einfach hier drauf. Das hilft allen anderen.",
+    tutMic: "Lieber sprechen? Mikrofon an, dann einfach sagen.", tutMicSpeech: "Wenn du gerade nicht tippen kannst, mach hier kurz das Mikrofon an. Dann sagst du einfach Blitzer oder Baustelle, ich hör zu. Nochmal drücken, und ich hör wieder auf.",
+    tutExit: "Hier beendest du die Fahrt.", tutExitSpeech: "Und hier unten beendest du die Fahrt, wann immer du magst. Komm gut an!",
+    startNavLabel: "▶ Los geht's",
+    speechLang: "de-DE",
+    bannerFarIn: "IN {d}M — GGF. UMFAHREN", bannerNearIn: "JETZT IN {d}M",
+    earlyLabel: "Vorwarnung ab",
+    fromPh: "Von …", toPh: "Nach … (z. B. San Antonio)",
+    searching: "Route wird berechnet …",
+    notFound: "Adressen nicht gefunden. Bitte anders formulieren.", notFoundStart: "Startadresse nicht gefunden — probier den 📍-Knopf.", notFoundEnd: "Ziel nicht gefunden — wähl einen Vorschlag aus der Liste.",
+    routeErr: "Route konnte nicht berechnet werden.",
+    routeOk: (n,km,min)=>`⏱ ${min} min · ${km} km · ${n} Warnung${n===1?'':'en'} auf dem Weg`,
+    routeBadge: (n)=>`${n} ⚠ auf deiner Route`,
+    needBoth: "Bitte Start und Ziel eingeben.",
+    nameLabel: "Name",
+    optionalHint: 'Kein Ziel? Nicht nötig — einfach unten "Standort verfolgen" drücken.',
+    obSubtitle: "Warnungen in Echtzeit, während du unterwegs bist.",
+    obNameLabel: "Dein Name", obLangLabel: "Deine Sprache",
+    obStart: "📍 Standort aktivieren & starten",
+    obHint: "Dein Standort wird nur genutzt, während diese Seite geöffnet ist.",
+    obStatusHead: "Lage auf Ibiza", islandClear: "Aktuell alles frei auf der Insel", islandBrief: "Aktuell auf der Insel gemeldet: {list}. Ich sag dir unterwegs rechtzeitig Bescheid.", islandBriefClear: "Aktuell ist auf der ganzen Insel nichts gemeldet. Ich meld mich, sobald etwas reinkommt.",
+    briefSignoff: "Gute Fahrt!",
+    rerouting: "Route wird neu berechnet …",
+    rerouted: (n,km)=>`Neue Route: ${km} km · ${n} Warnung${n===1?'':'en'} auf dem Weg`,
+    reroutedSpeech: "Neue Route berechnet."
+  },
+  en: {
+    demoLabel: "DEMO · Sample data",
+    subtitle: "Ibiza · Nearby warnings",
+    legend: ["Speed camera","Roadworks","Accident","Road closure"],
+    unit: "meters",
+    noLocationType: "No location",
+    noLocationDesc: "Enter a route or tap \"Track location\".",
+    trackStart: "📍 Track my location", trackStop: "⏸ Tracking on – tap to stop",
+    voiceOn: "🔊 Sound: On", voiceOff: "🔇 Sound: Off",
+    demoStart: "▶ Simulate ride", demoStop: "⏹ Stop demo",
+    footer: "Map data: OpenStreetMap contributors · Voice: Browser TTS (English)",
+    earlyLead: "heads up, in {d} meters there's:", nearLead: "coming up now, in {d} meters:",
+    junctionLead: "In {d} meters you could turn {dir} onto {s} to go around it.",
+    dirWords: {left:"left", right:"right", straight:"straight ahead", "slight left":"slightly left", "slight right":"slightly right", "sharp left":"sharply left", "sharp right":"sharply right", uturn:"around"},
+    greetWithName: "Hey {name}", greetPlain: "Hey",
+    navToward: "In {d}m toward",
+    myLocationLabel: "📍 My location", locating: "Locating …", locationErr: "Location unavailable.",
+    turnSoon: "In {d} meters, turn {dir} onto {s}.", turnNow: "Turn {dir} now.",
+    roundaboutSoon: "Heads up, roundabout in {d} meters — take the {n} exit toward {s}.", roundaboutNow: "Take the {n} exit now.",
+    roundaboutSoonNoExit: "Heads up, roundabout in {d} meters, toward {s}.", roundaboutNowNoExit: "Enter the roundabout now.",
+    easyToMissHint: "Careful, it's easy to miss.", navRoundaboutLabel: "In {d}m roundabout, exit {n}",
+    searchingSuggest: "Searching …", noSuggest: "No matches found.",
+    navStartSpeech: "let's go!", navStartStreet: "Head toward {s}.", navStartWarnings: "I'll let you know — you have {n} warnings along the way.",
+    navStartList: "On your route: {list}. I'll warn you in time.", navStartClear: "Your route is all clear right now — I'll speak up if something comes in.",
+    statusNext: "All quiet so far. Coming up in about {d} meters: {t}.", statusClear: "Still all clear. {km} kilometers to go, about {min} minutes.",
+    reportTitle: "What do you see here?", reportCancel: "Cancel", reportedByYou: "reported by you", reportThanks: "Thanks! {t} reported.",
+    reportSpoken: "Got it, {t} saved. Thanks!",
+    micOn: "Voice commands on — say e.g. 'speed camera' or 'roadworks'.", micOff: "Voice commands off.", micOnSpoken: "I'm listening. Just say speed camera, roadworks or accident.", micUnsupported: "Speech recognition is not supported on this device.",
+    followOn: "Close — looking ahead.", followOff: "Overview on.", viewNormal: "Standard view.", viewWide: "Wide overview.",
+    tutReport: "See something? One tap here helps everyone.", tutReportSpeech: "I'll keep you posted on everything I know along the way. And if you like, help out: if you spot something, just tap here. It helps everyone else.",
+    tutMic: "Rather speak? Turn on the mic and just say it.", tutMicSpeech: "If you can't tap right now, switch on the microphone here. Then just say speed camera or roadworks, and I'm listening. Press again and I'll stop.",
+    tutExit: "End your trip here.", tutExitSpeech: "And down here you can end the trip whenever you like. Ride safe!",
+    startNavLabel: "▶ Let's go",
+    speechLang: "en-GB",
+    bannerFarIn: "IN {d}M — DETOUR POSSIBLE", bannerNearIn: "NOW IN {d}M",
+    earlyLabel: "Early warning from",
+    fromPh: "From …", toPh: "To … (e.g. San Antonio)",
+    searching: "Calculating route …",
+    notFound: "Addresses not found. Try rephrasing.", notFoundStart: "Start not found — try the 📍 button.", notFoundEnd: "Destination not found — pick a suggestion from the list.",
+    routeErr: "Could not calculate route.",
+    routeOk: (n,km,min)=>`⏱ ${min} min · ${km} km · ${n} warning${n===1?'':'s'} along the way`,
+    routeBadge: (n)=>`${n} ⚠ on your route`,
+    needBoth: "Please enter both a start and destination.",
+    nameLabel: "Name",
+    optionalHint: 'No destination? No problem — just tap "Track my location" below.',
+    obSubtitle: "Real-time warnings while you're on the road.",
+    obNameLabel: "Your name", obLangLabel: "Your language",
+    obStart: "📍 Enable location & start",
+    obHint: "Your location is only used while this page is open.",
+    obStatusHead: "Situation on Ibiza", islandClear: "All clear on the island right now", islandBrief: "Currently reported on the island: {list}. I'll warn you in time along the way.", islandBriefClear: "Nothing reported anywhere on the island right now. I'll speak up as soon as something comes in.",
+    rerouting: "Recalculating route …",
+    briefSignoff: "Have a good ride!",
+    rerouted: (n,km)=>`New route: ${km} km · ${n} warning${n===1?'':'s'} along the way`,
+    reroutedSpeech: "New route calculated."
+  },
+  es: {
+    demoLabel: "DEMO · Datos de ejemplo",
+    subtitle: "Ibiza · Avisos cercanos",
+    legend: ["Radar","Obras","Accidente","Corte de carretera"],
+    unit: "metros",
+    noLocationType: "Sin ubicación",
+    noLocationDesc: "Introduce una ruta o toca «Seguir ubicación».",
+    trackStart: "📍 Seguir mi ubicación", trackStop: "⏸ Siguiendo – toca para parar",
+    voiceOn: "🔊 Sonido: activado", voiceOff: "🔇 Sonido: desactivado",
+    demoStart: "▶ Simular trayecto", demoStop: "⏹ Detener demo",
+    footer: "Datos: colaboradores de OpenStreetMap · Voz: TTS del navegador (Español)",
+    earlyLead: "ojo, en {d} metros hay:", nearLead: "ya casi, en {d} metros:",
+    junctionLead: "En {d} metros podrías girar {dir} hacia {s} para evitarlo.",
+    dirWords: {left:"a la izquierda", right:"a la derecha", straight:"recto", "slight left":"ligeramente a la izquierda", "slight right":"ligeramente a la derecha", "sharp left":"bruscamente a la izquierda", "sharp right":"bruscamente a la derecha", uturn:"en U"},
+    greetWithName: "Oye {name}", greetPlain: "Oye",
+    navToward: "En {d}m hacia",
+    myLocationLabel: "📍 Mi ubicación", locating: "Buscando ubicación …", locationErr: "Ubicación no disponible.",
+    turnSoon: "En {d} metros, gira {dir} hacia {s}.", turnNow: "Gira {dir} ahora.",
+    roundaboutSoon: "Atención, rotonda en {d} metros — toma la {n}ª salida hacia {s}.", roundaboutNow: "Toma ahora la {n}ª salida.",
+    roundaboutSoonNoExit: "Atención, rotonda en {d} metros, hacia {s}.", roundaboutNowNoExit: "Entra ahora en la rotonda.",
+    easyToMissHint: "Ojo, es fácil pasarla de largo.", navRoundaboutLabel: "En {d}m rotonda, salida {n}",
+    searchingSuggest: "Buscando …", noSuggest: "No se encontraron resultados.",
+    navStartSpeech: "¡vamos!", navStartStreet: "Dirígete hacia {s}.", navStartWarnings: "Te aviso — tienes {n} avisos en el camino.",
+    navStartList: "En tu ruta: {list}. Te aviso a tiempo.", navStartClear: "Tu ruta está despejada ahora mismo — te aviso si aparece algo.",
+    statusNext: "Todo tranquilo por ahora. En unos {d} metros: {t}.", statusClear: "Sigue despejado. Quedan {km} kilómetros, unos {min} minutos.",
+    reportTitle: "¿Qué ves aquí?", reportCancel: "Cancelar", reportedByYou: "reportado por ti", reportThanks: "¡Gracias! {t} reportado.",
+    reportSpoken: "Vale, {t} guardado. ¡Gracias!",
+    micOn: "Comandos de voz activados — di p. ej. 'radar' u 'obras'.", micOff: "Comandos de voz desactivados.", micOnSpoken: "Te escucho. Di radar, obras o accidente.", micUnsupported: "El reconocimiento de voz no está disponible en este dispositivo.",
+    followOn: "Cerca — mirando adelante.", followOff: "Vista general activada.", viewNormal: "Vista estándar.", viewWide: "Vista amplia.",
+    tutReport: "¿Ves algo? Un toque aquí ayuda a los demás.", tutReportSpeech: "Te iré informando de todo lo que sepa por el camino. Y si quieres, échame una mano: si ves algo, toca aquí. Ayuda a todos los demás.",
+    tutMic: "¿Prefieres hablar? Activa el micro y dilo.", tutMicSpeech: "Si ahora no puedes tocar, activa aquí el micrófono. Luego solo di radar u obras, y yo te escucho. Púlsalo otra vez y dejo de escuchar.",
+    tutExit: "Aquí terminas el viaje.", tutExitSpeech: "Y aquí abajo puedes terminar el viaje cuando quieras. ¡Buen camino!",
+    startNavLabel: "▶ Vamos",
+    speechLang: "es-ES",
+    bannerFarIn: "A {d}M — POSIBLE DESVÍO", bannerNearIn: "AHORA A {d}M",
+    earlyLabel: "Aviso previo desde",
+    fromPh: "Desde …", toPh: "Hasta … (p. ej. San Antonio)",
+    searching: "Calculando ruta …",
+    notFound: "Direcciones no encontradas. Prueba de otra forma.", notFoundStart: "Origen no encontrado — prueba el botón 📍.", notFoundEnd: "Destino no encontrado — elige una sugerencia de la lista.",
+    routeErr: "No se pudo calcular la ruta.",
+    routeOk: (n,km,min)=>`⏱ ${min} min · ${km} km · ${n} aviso${n===1?'':'s'} en el camino`,
+    routeBadge: (n)=>`${n} ⚠ en tu ruta`,
+    needBoth: "Introduce origen y destino.",
+    nameLabel: "Nombre",
+    optionalHint: '¿Sin destino? No hace falta — toca "Seguir mi ubicación" abajo.',
+    obSubtitle: "Avisos en tiempo real mientras conduces.",
+    obNameLabel: "Tu nombre", obLangLabel: "Tu idioma",
+    obStart: "📍 Activar ubicación y empezar",
+    obHint: "Tu ubicación solo se usa mientras esta página está abierta.",
+    obStatusHead: "Situación en Ibiza", islandClear: "Ahora mismo todo despejado en la isla", islandBrief: "Ahora mismo en la isla: {list}. Te aviso a tiempo por el camino.", islandBriefClear: "Ahora mismo no hay nada reportado en toda la isla. Te aviso en cuanto aparezca algo.",
+    rerouting: "Recalculando ruta …",
+    rerouted: (n,km)=>`Nueva ruta: ${km} km · ${n} aviso${n===1?'':'s'} en el camino`,
+    briefSignoff: "¡Buen viaje!",
+    reroutedSpeech: "Nueva ruta calculada."
+  },
+  it: {
+    demoLabel: "DEMO · Dati di esempio",
+    subtitle: "Ibiza · Avvisi nelle vicinanze",
+    legend: ["Autovelox","Lavori in corso","Incidente","Strada chiusa"],
+    unit: "metri",
+    noLocationType: "Nessuna posizione",
+    noLocationDesc: "Inserisci un percorso o tocca \"Segui posizione\".",
+    trackStart: "📍 Segui la mia posizione", trackStop: "⏸ In corso – tocca per fermare",
+    voiceOn: "🔊 Audio: attivo", voiceOff: "🔇 Audio: disattivato",
+    demoStart: "▶ Simula percorso", demoStop: "⏹ Ferma demo",
+    footer: "Dati mappa: collaboratori OpenStreetMap · Voce: TTS del browser (Italiano)",
+    earlyLead: "occhio, tra {d} metri c'è:", nearLead: "ci siamo quasi, tra {d} metri:",
+    junctionLead: "Tra {d} metri potresti svoltare {dir} su {s} per evitarlo.",
+    dirWords: {left:"a sinistra", right:"a destra", straight:"dritto", "slight left":"leggermente a sinistra", "slight right":"leggermente a destra", "sharp left":"bruscamente a sinistra", "sharp right":"bruscamente a destra", uturn:"a U"},
+    greetWithName: "Ehi {name}", greetPlain: "Ehi",
+    navToward: "Tra {d}m verso",
+    myLocationLabel: "📍 La mia posizione", locating: "Ricerca posizione …", locationErr: "Posizione non disponibile.",
+    turnSoon: "Tra {d} metri, svolta {dir} su {s}.", turnNow: "Svolta {dir} ora.",
+    roundaboutSoon: "Attenzione, rotonda tra {d} metri — prendi la {n}ª uscita verso {s}.", roundaboutNow: "Prendi ora la {n}ª uscita.",
+    roundaboutSoonNoExit: "Attenzione, rotonda tra {d} metri, verso {s}.", roundaboutNowNoExit: "Entra ora nella rotonda.",
+    easyToMissHint: "Attenzione, è facile perderla.", navRoundaboutLabel: "Tra {d}m rotonda, uscita {n}",
+    searchingSuggest: "Ricerca …", noSuggest: "Nessun risultato trovato.",
+    navStartSpeech: "andiamo!", navStartStreet: "Dirigiti verso {s}.", navStartWarnings: "Ti avviso — hai {n} avvisi lungo la strada.",
+    navStartList: "Sul tuo percorso: {list}. Ti avviso in tempo.", navStartClear: "Il tuo percorso è libero al momento — ti avviso se arriva qualcosa.",
+    statusNext: "Tutto tranquillo finora. Tra circa {d} metri: {t}.", statusClear: "Ancora tutto libero. Mancano {km} chilometri, circa {min} minuti.",
+    reportTitle: "Cosa vedi qui?", reportCancel: "Annulla", reportedByYou: "segnalato da te", reportThanks: "Grazie! {t} segnalato.",
+    reportSpoken: "Fatto, {t} salvato. Grazie!",
+    micOn: "Comandi vocali attivi — di' p. es. 'autovelox' o 'lavori'.", micOff: "Comandi vocali disattivati.", micOnSpoken: "Ti ascolto. Di' autovelox, lavori o incidente.", micUnsupported: "Il riconoscimento vocale non è supportato su questo dispositivo.",
+    followOn: "Vicino — sguardo in avanti.", followOff: "Panoramica attiva.", viewNormal: "Vista standard.", viewWide: "Vista ampia.",
+    tutReport: "Vedi qualcosa? Un tocco qui aiuta tutti.", tutReportSpeech: "Ti terrò aggiornato su tutto quello che so lungo la strada. E se ti va, dammi una mano: se vedi qualcosa, tocca qui. Aiuta tutti gli altri.",
+    tutMic: "Preferisci parlare? Attiva il microfono e dillo.", tutMicSpeech: "Se ora non puoi toccare, attiva qui il microfono. Poi di' semplicemente autovelox o lavori, e io ascolto. Premi di nuovo e smetto.",
+    tutExit: "Qui termini il viaggio.", tutExitSpeech: "E qui sotto puoi terminare il viaggio quando vuoi. Buon viaggio!",
+    startNavLabel: "▶ Andiamo",
+    speechLang: "it-IT",
+    bannerFarIn: "TRA {d}M — POSSIBILE DEVIAZIONE", bannerNearIn: "ORA A {d}M",
+    earlyLabel: "Preavviso da",
+    fromPh: "Da …", toPh: "A … (es. San Antonio)",
+    searching: "Calcolo del percorso …",
+    notFound: "Indirizzi non trovati. Prova a riformulare.", notFoundStart: "Partenza non trovata — prova il pulsante 📍.", notFoundEnd: "Destinazione non trovata — scegli un suggerimento dalla lista.",
+    routeErr: "Impossibile calcolare il percorso.",
+    routeOk: (n,km,min)=>`⏱ ${min} min · ${km} km · ${n} avviso${n===1?'':'i'} lungo la strada`,
+    routeBadge: (n)=>`${n} ⚠ sul tuo percorso`,
+    needBoth: "Inserisci partenza e destinazione.",
+    nameLabel: "Nome",
+    optionalHint: 'Nessuna destinazione? Non serve — tocca "Segui la mia posizione" qui sotto.',
+    obSubtitle: "Avvisi in tempo reale mentre sei in viaggio.",
+    obNameLabel: "Il tuo nome", obLangLabel: "La tua lingua",
+    obStart: "📍 Attiva posizione e inizia",
+    obHint: "La tua posizione viene usata solo mentre questa pagina è aperta.",
+    obStatusHead: "Situazione a Ibiza", islandClear: "Al momento tutto libero sull'isola", islandBrief: "Al momento sull'isola: {list}. Ti avviso in tempo lungo la strada.", islandBriefClear: "Al momento non c'è nulla segnalato sull'isola. Ti avviso appena arriva qualcosa.",
+    rerouting: "Ricalcolo del percorso …",
+    rerouted: (n,km)=>`Nuovo percorso: ${km} km · ${n} avviso${n===1?'':'i'} lungo la strada`,
+    reroutedSpeech: "Nuovo percorso calcolato.",
+    briefSignoff: "Buon viaggio!",
+  },
+  nl: {
+    demoLabel: "DEMO · Voorbeelddata",
+    subtitle: "Ibiza · Waarschuwingen in de buurt",
+    legend: ["Flitser","Wegwerkzaamheden","Ongeval","Wegafsluiting"],
+    unit: "meter",
+    noLocationType: "Geen locatie",
+    noLocationDesc: "Voer een route in of tik op \"Locatie volgen\".",
+    trackStart: "📍 Volg mijn locatie", trackStop: "⏸ Actief – tik om te stoppen",
+    voiceOn: "🔊 Geluid: aan", voiceOff: "🔇 Geluid: uit",
+    demoStart: "▶ Rit simuleren", demoStop: "⏹ Demo stoppen",
+    footer: "Kaartgegevens: OpenStreetMap-bijdragers · Stem: Browser-TTS (Nederlands)",
+    earlyLead: "let op, over {d} meter komt er:", nearLead: "bijna, over {d} meter:",
+    junctionLead: "Over {d} meter kun je {dir} afslaan naar {s} om het te omzeilen.",
+    dirWords: {left:"links", right:"rechts", straight:"rechtdoor", "slight left":"licht links", "slight right":"licht rechts", "sharp left":"scherp links", "sharp right":"scherp rechts", uturn:"omkeren"},
+    greetWithName: "Hé {name}", greetPlain: "Hé",
+    navToward: "Over {d}m richting",
+    myLocationLabel: "📍 Mijn locatie", locating: "Locatie zoeken …", locationErr: "Locatie niet beschikbaar.",
+    turnSoon: "Over {d} meter, sla {dir} af naar {s}.", turnNow: "Sla nu {dir} af.",
+    roundaboutSoon: "Let op, rotonde over {d} meter — neem daar de {n}e afslag richting {s}.", roundaboutNow: "Neem nu de {n}e afslag.",
+    roundaboutSoonNoExit: "Let op, rotonde over {d} meter, richting {s}.", roundaboutNowNoExit: "Ga nu de rotonde op.",
+    easyToMissHint: "Let op, die mis je snel.", navRoundaboutLabel: "Over {d}m rotonde, afslag {n}",
+    searchingSuggest: "Zoeken …", noSuggest: "Geen resultaten gevonden.",
+    navStartSpeech: "we gaan!", navStartStreet: "Rijd richting {s}.", navStartWarnings: "Ik waarschuw je — je hebt {n} meldingen onderweg.",
+    navStartList: "Op je route: {list}. Ik waarschuw je op tijd.", navStartClear: "Je route is nu helemaal vrij — ik meld het als er iets binnenkomt.",
+    statusNext: "Alles rustig tot nu toe. Over ongeveer {d} meter: {t}.", statusClear: "Nog steeds alles vrij. Nog {km} kilometer, ongeveer {min} minuten.",
+    reportTitle: "Wat zie je hier?", reportCancel: "Annuleren", reportedByYou: "door jou gemeld", reportThanks: "Bedankt! {t} gemeld.",
+    reportSpoken: "Oké, {t} opgeslagen. Bedankt!",
+    micOn: "Spraakcommando's aan — zeg bv. 'flitser' of 'wegwerkzaamheden'.", micOff: "Spraakcommando's uit.", micOnSpoken: "Ik luister. Zeg flitser, wegwerkzaamheden of ongeval.", micUnsupported: "Spraakherkenning wordt op dit apparaat niet ondersteund.",
+    followOn: "Dichtbij — blik vooruit.", followOff: "Overzicht aan.", viewNormal: "Standaardweergave.", viewWide: "Ruim overzicht.",
+    tutReport: "Zie je iets? Eén tik hier helpt iedereen.", tutReportSpeech: "Ik hou je onderweg op de hoogte van alles wat ik weet. En als je wilt, help even mee: zie je iets, tik dan hier. Dat helpt alle anderen.",
+    tutMic: "Liever praten? Zet de microfoon aan en zeg het.", tutMicSpeech: "Kun je nu niet tikken, zet hier dan de microfoon aan. Zeg gewoon flitser of wegwerkzaamheden, ik luister. Nogmaals drukken en ik stop.",
+    tutExit: "Hier stop je de rit.", tutExitSpeech: "En hier beneden stop je de rit wanneer je wilt. Goede reis!",
+    startNavLabel: "▶ Laten we gaan",
+    speechLang: "nl-NL",
+    bannerFarIn: "OVER {d}M — OMLEIDING MOGELIJK", bannerNearIn: "NU OVER {d}M",
+    earlyLabel: "Vroege waarschuwing vanaf",
+    fromPh: "Van …", toPh: "Naar … (bv. San Antonio)",
+    searching: "Route wordt berekend …",
+    notFound: "Adressen niet gevonden. Probeer het anders.", notFoundStart: "Vertrek niet gevonden — probeer de 📍-knop.", notFoundEnd: "Bestemming niet gevonden — kies een suggestie uit de lijst.",
+    routeErr: "Route kon niet worden berekend.",
+    routeOk: (n,km,min)=>`⏱ ${min} min · ${km} km · ${n} waarschuwing${n===1?'':'en'} onderweg`,
+    routeBadge: (n)=>`${n} ⚠ op je route`,
+    needBoth: "Voer vertrek en bestemming in.",
+    nameLabel: "Naam",
+    optionalHint: 'Geen bestemming? Geen probleem — tik hieronder op "Volg mijn locatie".',
+    obSubtitle: "Realtime waarschuwingen onderweg.",
+    obNameLabel: "Je naam", obLangLabel: "Je taal",
+    obStart: "📍 Locatie inschakelen & starten",
+    obHint: "Je locatie wordt alleen gebruikt terwijl deze pagina open is.",
+    obStatusHead: "Situatie op Ibiza", islandClear: "Momenteel alles vrij op het eiland", islandBrief: "Momenteel op het eiland: {list}. Ik waarschuw je onderweg op tijd.", islandBriefClear: "Er is momenteel niets gemeld op het hele eiland. Ik meld het zodra er iets binnenkomt.",
+    rerouting: "Route wordt herberekend …",
+    rerouted: (n,km)=>`Nieuwe route: ${km} km · ${n} waarschuwing${n===1?'':'en'} onderweg`,
+    reroutedSpeech: "Nieuwe route berekend.",
+    briefSignoff: "Goede reis!"
+  }
+};
+
+const hazards = [
+  { lat: 38.9067, lng: 1.4206, type: "blitzer", icon: "📷",
+    original: "Radar móvil en Av. Isidor Macabich, sentido Marina",
+    de: "Mobiler Blitzer auf der Av. Isidor Macabich, Richtung Marina",
+    en: "Mobile speed camera on Av. Isidor Macabich, towards Marina",
+    es: "Radar móvil en Av. Isidor Macabich, sentido Marina",
+    it: "Autovelox mobile su Av. Isidor Macabich, direzione Marina",
+    nl: "Mobiele flitser op Av. Isidor Macabich, richting Marina" },
+  { lat: 38.9105, lng: 1.4330, type: "baustelle", icon: "🚧",
+    original: "Obras en la carretera Ibiza–Santa Eulària, un carril cortado",
+    de: "Baustelle auf der Straße Ibiza–Santa Eulària, eine Spur gesperrt",
+    en: "Roadworks on the Ibiza–Santa Eulària road, one lane closed",
+    es: "Obras en la carretera Ibiza–Santa Eulària, un carril cortado",
+    it: "Lavori in corso sulla strada Ibiza–Santa Eulària, una corsia chiusa",
+    nl: "Wegwerkzaamheden op de weg Ibiza–Santa Eulària, één rijstrook dicht" },
+  { lat: 38.9245, lng: 1.4423, type: "unfall", icon: "⚠️",
+    original: "Accidente cerca de Jesús, circulación lenta",
+    de: "Unfall bei Jesús, Verkehr staut sich",
+    en: "Accident near Jesús, slow-moving traffic",
+    es: "Accidente cerca de Jesús, circulación lenta",
+    it: "Incidente vicino a Jesús, traffico rallentato",
+    nl: "Ongeval bij Jesús, langzaam verkeer" },
+  { lat: 38.9310, lng: 1.4505, type: "sperre", icon: "⛔",
+    original: "Carretera cortada por fiesta local en Sant Jordi",
+    de: "Straße wegen lokalem Fest in Sant Jordi gesperrt",
+    en: "Road closed for local festival in Sant Jordi",
+    es: "Carretera cortada por fiesta local en Sant Jordi",
+    it: "Strada chiusa per festa locale a Sant Jordi",
+    nl: "Weg afgesloten voor lokaal feest in Sant Jordi" },
+  { lat: 38.8990, lng: 1.4275, type: "blitzer", icon: "📷",
+    original: "Control de velocidad fijo cerca del aeropuerto",
+    de: "Fester Blitzer nahe dem Flughafen",
+    en: "Fixed speed camera near the airport",
+    es: "Control de velocidad fijo cerca del aeropuerto",
+    it: "Autovelox fisso vicino all'aeroporto",
+    nl: "Vaste flitser bij de luchthaven" },
+  { lat: 38.9701, lng: 1.4610, type: "baustelle", icon: "🚧",
+    original: "Obras en la carretera hacia Sant Joan, tramo estrecho",
+    de: "Baustelle auf der Straße Richtung Sant Joan, enge Fahrbahn",
+    en: "Roadworks on the road towards Sant Joan, narrow section",
+    es: "Obras en la carretera hacia Sant Joan, tramo estrecho",
+    it: "Lavori in corso sulla strada per Sant Joan, tratto stretto",
+    nl: "Wegwerkzaamheden op de weg naar Sant Joan, smal wegvak" },
+  { lat: 38.9803, lng: 1.4290, type: "blitzer", icon: "📷",
+    original: "Radar fijo cerca de Sant Miquel",
+    de: "Fester Blitzer nahe Sant Miquel",
+    en: "Fixed speed camera near Sant Miquel",
+    es: "Radar fijo cerca de Sant Miquel",
+    it: "Autovelox fisso vicino a Sant Miquel",
+    nl: "Vaste flitser bij Sant Miquel" }
+];
+
+const typeIndex = {blitzer:0, baustelle:1, unfall:2, sperre:3};
+let lang = 'de';
+let currentT = ui[lang];
+
+let routeCoords = null;
+let destCoords = null; // Ziel-Koordinaten, damit wir bei Bedarf neu routen koennen
+let myLocationCoords = null; // gesetzt, wenn "Meinen Standort verwenden" aktiv ist
+let routeSteps = [];   // Echte Kreuzungen/Abzweigungen entlang der Route (von OSRM)
+let isRerouting = false;
+let lastRerouteAttempt = 0;
+const OFF_ROUTE_THRESHOLD_M = 80;   // ab wann gilt: "von der Route abgekommen"
+const REROUTE_COOLDOWN_MS = 15000;  // nicht öfter als alle 15s neu berechnen
+let routeLine = null;
+let routeGlow = null; // breite, weiche Aussenlinie fuer den Leucht-Effekt der Route
+let closeFollow = false; // Nahansicht mit Blick nach vorn aktiv?
+let viewMode = 0;        // 0=Standard, 1=Nah (Blick nach vorn), 2=Weiter Ueberblick
+let cameraHoldUntil = 0; // bis wann die automatische Kartenverfolgung pausiert
+let nextTurnDistance = null; // Entfernung zur naechsten Abbiegung (fuer Kamera-Vorrang)
+let startMarker = null, endMarker = null;
+let activeHazardKeys = null;
+const ROUTE_BUFFER_M = 300;
+
+// Zwei-Stufen-Warnsystem: frueher Hinweis (Zeit zum Umfahren) + Nah-Warnung (Bestaetigung)
+let EARLY_THRESHOLD = 800; // Meter, per Dropdown einstellbar
+const NEAR_THRESHOLD = 150;  // "Bestaetigungs"-Warnung kurz vorher
+const VERY_NEAR = 60;        // Sehr nah: Flash + Vibration
+
+function applyLanguage(){
+  currentT = ui[lang];
+  document.documentElement.lang = lang;
+  document.getElementById('demoLabel').textContent = currentT.demoLabel;
+  document.getElementById('subtitle').textContent = currentT.subtitle;
+  document.getElementById('lg1').textContent = currentT.legend[0];
+  document.getElementById('lg2').textContent = currentT.legend[1];
+  document.getElementById('lg3').textContent = currentT.legend[2];
+  document.getElementById('lg4').textContent = currentT.legend[3];
+  document.getElementById('nearestUnit').textContent = currentT.unit;
+  document.getElementById('fromInput').placeholder = currentT.fromPh;
+  document.getElementById('toInput').placeholder = currentT.toPh;
+  document.getElementById('earlyLabel').textContent = currentT.earlyLabel;
+  document.getElementById('optionalHint').textContent = currentT.optionalHint;
+  document.getElementById('reportTitle').textContent = currentT.reportTitle;
+  document.getElementById('reportCancel').textContent = currentT.reportCancel;
+  document.getElementById('ropt1').textContent = currentT.legend[0];
+  document.getElementById('ropt2').textContent = currentT.legend[1];
+  document.getElementById('ropt3').textContent = currentT.legend[2];
+  document.getElementById('ropt4').textContent = currentT.legend[3];
+  document.getElementById('nameLabel').textContent = currentT.nameLabel;
+  document.getElementById('trackBtn').textContent = watchId ? currentT.trackStop : (routeCoords ? currentT.startNavLabel : currentT.trackStart);
+  document.getElementById('voiceBtn').textContent = voiceOn ? currentT.voiceOn : currentT.voiceOff;
+  document.getElementById('demoBtn').textContent = demoInterval ? currentT.demoStop : currentT.demoStart;
+  document.getElementById('footerNote').textContent = currentT.footer;
+  if(!lastClosest){
+    document.getElementById('nearestType').textContent = currentT.noLocationType;
+    document.getElementById('nearestDesc').textContent = currentT.noLocationDesc;
+  } else {
+    document.getElementById('nearestType').textContent = currentT.legend[typeIndex[lastClosest.type]];
+    document.getElementById('nearestDesc').textContent = lastClosest[lang];
+  }
+  if(activeHazardKeys){
+    document.getElementById('routeBadge').textContent = currentT.routeBadge(activeHazardKeys.size);
+  }
+  hazardMarkers.forEach(m=>{ m.marker.setPopupContent(popupHtml(m.hazard)); });
+}
+
+document.getElementById('langSel').addEventListener('change', function(){
+  lang = this.value;
+  applyLanguage();
+});
+document.getElementById('earlyDistSel').addEventListener('change', function(){
+  EARLY_THRESHOLD = parseInt(this.value, 10);
+});
+
+// Startansicht: die ganze Insel Ibiza im Blick, bis der eigene Standort feststeht
+const map = L.map('map', {zoomControl:false}).setView([38.98, 1.43], 11);
+// Detaillierte Strassenkarte ueber CARTO (zuverlaessiger fuer oeffentlich eingebettete Seiten
+// als der offizielle OSM-Kachelserver, der Dauereinsatz auf fremden Webseiten oft blockt)
+const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap-Mitwirkende &copy; CARTO',
+  maxZoom: 20,
+  subdomains: 'abcd'
+}).addTo(map);
+// Satelliten-Ansicht fuer den Navigations-Modus (Esri World Imagery, oeffentlich nutzbar)
+const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Esri, Maxar, Earthstar Geographics',
+  maxZoom: 19
+});
+// Strassennamen-Beschriftung fuer den Hybrid-Modus (Satellitenbild + Strassennamen darueber)
+const labelsLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Esri',
+  maxZoom: 19, pane: 'overlayPane'
+});
+// Dunkle Navi-Karte: Umgebung tritt zurueck, die eigene Route sticht hervor -
+// angenehmer bei Nacht und lenkt den Blick auf das Wesentliche.
+const darkNavLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap-Mitwirkende &copy; CARTO',
+  maxZoom: 20,
+  subdomains: 'abcd'
+});
+L.control.zoom({position:'bottomright'}).addTo(map);
+
+function hazardKey(h){ return h.lat+","+h.lng; }
+function popupHtml(h){
+  return `<b>${currentT.legend[typeIndex[h.type]]}</b><br>${h[lang]}<br><i style="color:#888">${h.original}</i>`;
+}
+function pinIcon(h, tier, dimmed){
+  const cls = tier==='near' ? 'pulseNear' : (tier==='far' ? 'pulseFar' : '');
+  return L.divIcon({
+    className: '',
+    html: `<div class="marker-pin marker-${h.type} ${cls} ${dimmed ? 'dimmed' : ''}"><span>${h.icon}</span></div>`,
+    iconSize:[30,30], iconAnchor:[15,30]
+  });
+}
+const hazardMarkers = hazards.map(h=>{
+  const marker = L.marker([h.lat,h.lng], {icon:pinIcon(h,null,false)})
+    .addTo(map)
+    .bindPopup(popupHtml(h));
+  return {hazard:h, marker};
+});
+
+let userMarker = null;
+let userAccuracyCircle = null;
+let watchId = null;
+let voiceOn = true;
+// pro Hazard merken wir, welche Warnstufen schon ausgeloest wurden
+let announced = {}; // key -> {early:bool, near:bool, veryNear:bool}
+let hasGreetedThisSession = false; // nur beim ersten Hinweis pro Fahrt mit Namen gruessen
+let navAnnounced = {}; // welche Abbiegungen (nach Index) schon per Sprache angesagt wurden
+let lastStatusUpdate = 0; // Zeitpunkt der letzten gesprochenen Zwischenmeldung
+let lastClosest = null;
+
+const nearestEl = document.getElementById('nearest');
+const nearestDist = document.getElementById('nearestDist');
+const nearestType = document.getElementById('nearestType');
+const nearestDesc = document.getElementById('nearestDesc');
+const toast = document.getElementById('toast');
+const flashOverlay = document.getElementById('flashOverlay');
+const alertBanner = document.getElementById('alertBanner');
+const bannerIcon = document.getElementById('bannerIcon');
+const bannerTxt = document.getElementById('bannerTxt');
+const bannerSub = document.getElementById('bannerSub');
+const routeStatus = document.getElementById('routeStatus');
+const routeBadge = document.getElementById('routeBadge');
+
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000;
+  const dLat=(lat2-lat1)*Math.PI/180;
+  const dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// Baut eine lockere, persoenliche Anrede ("Hey Max" oder einfach "Hey", falls kein Name)
+function greetPhrase(){
+  const name = document.getElementById('nameInput').value.trim();
+  return name ? currentT.greetWithName.replace('{name}', name) : currentT.greetPlain;
+}
+
+// ---- Natuerlichere Stimme auswaehlen statt der oft roboterhaften Systemstandard-Stimme ----
+let cachedVoices = [];
+function refreshVoices(){ cachedVoices = speechSynthesis.getVoices(); }
+if('speechSynthesis' in window){
+  refreshVoices();
+  speechSynthesis.onvoiceschanged = refreshVoices;
+}
+// Bevorzugte, natuerlicher klingende Stimmennamen je Sprache (iOS/Android/Desktop-Varianten)
+// Bevorzugt weibliche, weich klingende Stimmen (nach Wunsch), hochwertige Varianten zuerst
+const preferredVoiceNames = {
+  'de-DE': ['Anna (Premium)','Helena (Premium)','Petra (Premium)','Anna (Enhanced)','Petra (Enhanced)','Helena','Anna','Petra','Google Deutsch'],
+  'en-GB': ['Serena (Premium)','Kate (Premium)','Serena (Enhanced)','Kate (Enhanced)','Serena','Kate','Google UK English Female'],
+  'es-ES': ['Mónica (Premium)','Marisol (Premium)','Mónica (Enhanced)','Mónica','Marisol','Paulina','Google español'],
+  'it-IT': ['Alice (Premium)','Federica (Premium)','Alice (Enhanced)','Alice','Federica','Google italiano'],
+  'nl-NL': ['Claire (Premium)','Claire (Enhanced)','Claire','Ellen','Google Nederlands']
+};
+// Namen, die typischerweise zu weiblichen Systemstimmen gehoeren - fuer die Rueckfallsuche
+const femaleVoiceHints = /anna|helena|petra|serena|kate|monica|mónica|marisol|paulina|alice|federica|claire|ellen|female|frau|femme|mujer|donna|vrouw/i;
+function pickVoice(langCode){
+  if(!cachedVoices.length) return null;
+  const prefs = preferredVoiceNames[langCode] || [];
+  for(const name of prefs){
+    const match = cachedVoices.find(v => v.name === name);
+    if(match) return match;
+  }
+  const sameLang = cachedVoices.filter(v => v.lang === langCode || v.lang.startsWith(langCode.split('-')[0]));
+  // Zuerst: hochwertige UND weibliche Stimme
+  const femaleHQ = sameLang.find(v => femaleVoiceHints.test(v.name) && /premium|enhanced|neural|siri|natural/i.test(v.name));
+  if(femaleHQ) return femaleHQ;
+  // Dann: irgendeine weibliche Stimme
+  const female = sameLang.find(v => femaleVoiceHints.test(v.name));
+  if(female) return female;
+  // Sonst: hochwertige Stimme, egal welche
+  const highQuality = sameLang.find(v => /premium|enhanced|neural|siri|natural/i.test(v.name));
+  if(highQuality) return highQuality;
+  // Lokal installierte Stimmen klingen meist besser als Netz-Stimmen und stocken nicht
+  const localVoice = sameLang.find(v => v.localService);
+  return localVoice || sameLang[0] || null;
+}
+
+// Macht den Text fluessiger sprechbar: sorgt fuer natuerliche Pausen und verhindert,
+// dass Zahlen/Abkuerzungen abgehackt vorgelesen werden.
+function naturalizeText(text){
+  return text
+    .replace(/\s*—\s*/g, ', ')      // Gedankenstriche werden sonst als Bruch gelesen
+    .replace(/\s*\.\s*/g, '. ')     // klare Satzpausen
+    .replace(/\s{2,}/g, ' ')
+    .replace(/(\d)\.\s/g, '$1. ')   // "2. Ausfahrt" sauber trennen
+    .trim();
+}
+
+// Ansagen werden nacheinander abgespielt statt sich gegenseitig abzuschneiden.
+// Nur wirklich dringende Ansagen (z.B. "jetzt rechts") duerfen vordraengeln.
+let speechQueue = [];
+let speaking = false;
+
+function processSpeechQueue(){
+  if(speaking || speechQueue.length === 0) return;
+  const text = speechQueue.shift();
+  speaking = true;
+
+  const u = new SpeechSynthesisUtterance(naturalizeText(text));
+  u.lang = currentT.speechLang;
+  const voice = pickVoice(currentT.speechLang);
+  if(voice) u.voice = voice;
+  u.rate = 0.9;    // ruhiges Tempo - klingt sanfter und ist beim Fahren besser verstaendlich
+  u.pitch = 1.06;  // eine Spur heller/weicher, wirkt freundlicher
+  u.volume = 1.0;
+  u.onend = ()=>{ speaking = false; setTimeout(processSpeechQueue, 220); };
+  u.onerror = ()=>{ speaking = false; setTimeout(processSpeechQueue, 220); };
+  speechSynthesis.speak(u);
+}
+
+function speak(text, urgent){
+  if(!voiceOn || !('speechSynthesis' in window)) return;
+  if(urgent){
+    // Dringend: alles Wartende verwerfen und sofort sprechen
+    speechQueue = [];
+    speechSynthesis.cancel();
+    speaking = false;
+    speechQueue.push(text);
+  } else {
+    // Warteschlange nicht volllaufen lassen - sonst redet sie hinterher noch minutenlang
+    if(speechQueue.length >= 3) speechQueue.shift();
+    speechQueue.push(text);
+  }
+  processSpeechQueue();
+}
+
+// iOS blockiert Sprachausgabe, wenn die allererste Ansage einer Seite nicht direkt aus
+// einem Fingertipp ausgeloest wird (z.B. aus einem GPS-Hintergrund-Callback statt einem
+// Klick). Diese Funktion "entsperrt" die Sprachausgabe, indem sie direkt beim Tippen auf
+// den Start-Button eine winzige, fast unhoerbare Ansage macht.
+function unlockSpeech(){
+  if(!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(' ');
+  u.volume = 0.01;
+  speechSynthesis.speak(u);
+}
+
+function showToast(text, far){
+  toast.textContent = text;
+  toast.classList.toggle('toastFar', !!far);
+  toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=>toast.classList.remove('show'), 4000);
+}
+
+function showBanner(h, dist, tier){
+  bannerIcon.textContent = h.icon;
+  alertBanner.classList.remove('tierFar','tierNear');
+  alertBanner.classList.add(tier==='far' ? 'tierFar' : 'tierNear');
+  const tpl = tier==='far' ? currentT.bannerFarIn : currentT.bannerNearIn;
+  bannerTxt.textContent = `${currentT.legend[typeIndex[h.type]].toUpperCase()} ${tpl.replace('{d}', Math.round(dist))}`;
+  bannerSub.textContent = h[lang];
+  alertBanner.classList.add('show');
+  clearTimeout(showBanner._t);
+  showBanner._t = setTimeout(()=>alertBanner.classList.remove('show'), 5000);
+
+  highlightHazardOnMap(h, tier);
+}
+
+// Hebt den betroffenen Punkt kurz auf der Karte hervor (wachsender Ring), damit sofort
+// klar ist, WO die Warnung liegt - nicht nur, dass es eine gibt.
+let highlightRings = [];
+function highlightHazardOnMap(h, tier){
+  const color = tier === 'near' ? '#EF4444' : '#F5A623';
+
+  // Kamera-Fahrt: kurz herauszoomen und Warnung + eigene Position zusammen zeigen,
+  // damit man einordnen kann WO das liegt - danach automatisch zurueck zur Fahransicht.
+  // Nicht, wenn gerade eine Abbiegung unmittelbar bevorsteht - dann hat die Abbiegung Vorrang.
+  const turnImminent = nextTurnDistance !== null && nextTurnDistance < 300;
+  if(navModeOn && userMarker && tier === 'far' && !turnImminent){
+    const me = userMarker.getLatLng();
+    const bounds = L.latLngBounds([[me.lat, me.lng], [h.lat, h.lng]]);
+    map.flyToBounds(bounds, {padding:[70,110], maxZoom:16, duration:1.1});
+    cameraHoldUntil = Date.now() + 3600; // Verfolgung waehrend der Uebersicht pausieren
+    clearTimeout(highlightHazardOnMap._back);
+    highlightHazardOnMap._back = setTimeout(()=>{
+      if(!navModeOn || !userMarker) return;
+      const p = userMarker.getLatLng();
+      if(viewMode === 1) centerWithLookAhead(p.lat, p.lng, 18);
+      else map.flyTo(p, viewMode === 2 ? 14 : 16, {duration:1.0});
+    }, 3600); // gut 3 Sekunden Ueberblick, dann wieder ran
+  }
+
+  // Kommt die Warnung ganz nah, nochmal deutlich heranzoomen, damit man genau sieht,
+  // an welcher Stelle sie liegt (z.B. an welcher Einmuendung die Kontrolle steht).
+  if(navModeOn && userMarker && tier === 'near'){
+    const p = userMarker.getLatLng();
+    cameraHoldUntil = Date.now() + 2600;
+    if(viewMode === 1) centerWithLookAhead(p.lat, p.lng, 19);
+    else map.flyTo(p, 19, {duration:0.9});
+  }
+
+  // Mehrere Ringe nacheinander = deutlich sichtbarer "Ping" auf der Karte
+  [0, 350, 700].forEach(delay=>{
+    setTimeout(()=>{
+      const ring = L.circleMarker([h.lat, h.lng], {
+        radius: 14, color: color, weight: 3, fill: false, opacity: 0.95
+      }).addTo(map);
+      highlightRings.push(ring);
+      let r = 14, o = 0.95;
+      const grow = setInterval(()=>{
+        r += 3.5; o -= 0.055;
+        if(o <= 0){
+          clearInterval(grow);
+          map.removeLayer(ring);
+          highlightRings = highlightRings.filter(x => x !== ring);
+          return;
+        }
+        ring.setRadius(r);
+        ring.setStyle({opacity:o});
+      }, 45);
+    }, delay);
+  });
+}
+
+function flash(){
+  flashOverlay.classList.remove('flash');
+  void flashOverlay.offsetWidth;
+  flashOverlay.classList.add('flash');
+}
+function vibrate(pattern){ if(navigator.vibrate) navigator.vibrate(pattern); }
+
+// Kurzer weisser Blitz ueber den Bildschirm - macht jede neue Meldung sofort sichtbar,
+// auch wenn man nur aus dem Augenwinkel hinschaut.
+function whiteFlash(){
+  const el = document.getElementById('whiteFlash');
+  if(!el) return;
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
+}
+
+// Jeder Knopfdruck in der App gibt ein kurzes haptisches Feedback (wie bei nativen Apps).
+document.addEventListener('click', function(e){
+  if(e.target && e.target.closest && e.target.closest('button')){
+    vibrate(18); // ganz kurzer "Tack"
+  }
+}, true);
+
+
+// Filtert grobe GPS-Ausreisser heraus: ein einzelner sehr ungenauer oder unrealistisch
+// weit entfernter Sprung wird ignoriert, damit die Karte nicht wild hin- und herspringt.
+let lastGoodFix = null;
+function isReliableFix(lat, lng, accuracy){
+  if(accuracy && accuracy > 150) return false; // sehr ungenauer Fix (z.B. gerade erst gestartet)
+  if(lastGoodFix){
+    const jump = haversine(lastGoodFix.lat, lastGoodFix.lng, lat, lng);
+    const secondsSince = (Date.now() - lastGoodFix.t) / 1000;
+    // realistischer Maximalsprung: grosszuegig 60 m/s (216 km/h) als Obergrenze
+    if(jump / Math.max(secondsSince, 1) > 60) return false;
+  }
+  return true;
+}
+
+function updatePosition(lat, lng, accuracy, heading){
+  if(accuracy !== undefined && !isReliableFix(lat, lng, accuracy)) return; // Ausreisser ignorieren
+  lastGoodFix = { lat, lng, t: Date.now() };
+
+  if(!userMarker){
+    // Aeusserer Genauigkeits-Kreis (wie bei Google Maps: zeigt, wie unsicher der GPS-Fix ist)
+    userAccuracyCircle = L.circle([lat,lng], {
+      radius: accuracy || 30, color:'#2F6FED', weight:0, fillColor:'#2F6FED', fillOpacity:0.15
+    }).addTo(map);
+    // Der eigentliche blaue Punkt mit weissem Rand
+    userMarker = L.circleMarker([lat,lng], {
+      radius:9, color:'#fff', weight:3, fillColor:'#2F6FED', fillOpacity:1
+    }).addTo(map);
+    // Beim allerersten Standort direkt hinspringen, statt die ganze Insel zu zeigen
+    map.flyTo([lat, lng], 15, {duration:1.2});
+  } else {
+    userMarker.setLatLng([lat,lng]);
+    if(userAccuracyCircle){
+      userAccuracyCircle.setLatLng([lat,lng]);
+      if(accuracy) userAccuracyCircle.setRadius(accuracy);
+    }
+  }
+
+  // Sobald eine Route berechnet ist UND der Standort verfolgt wird, automatisch
+  // in den Navigations-Vollbildmodus wechseln (wie bei Google Maps nach "Start").
+  if(routeCoords && routeCoords.length && (watchId || demoInterval)){
+    enterNavMode();
+    if(routeSteps.length){
+      updateNavBanner(lat, lng); // zentriert die Karte selbst mit
+    } else {
+      map.setView([lat, lng], 17, {animate:true}); // Rueckfallebene: trotzdem der Position folgen
+    }
+    updateNavEta(lat, lng);
+  } else if(watchId && Date.now() > cameraHoldUntil){
+    // Ohne Route: die Karte folgt trotzdem sanft der eigenen Position, damit die App
+    // auch als reiner Warn-Radar funktioniert - ganz ohne Zieleingabe.
+    map.panTo([lat, lng], {animate:true, duration:0.8});
+  }
+
+  maybeReroute(lat, lng);
+
+  let closest = null, closestDist = Infinity, closestTier = null;
+
+  hazardMarkers.forEach(hm=>{
+    const h = hm.hazard;
+    const key = hazardKey(h);
+    const onRoute = !activeHazardKeys || activeHazardKeys.has(key);
+    const d = haversine(lat,lng,h.lat,h.lng);
+    if(!announced[key]) announced[key] = {early:false, near:false, veryNear:false};
+
+    if(onRoute && d < closestDist){ closestDist = d; closest = h; }
+
+    let tier = null;
+    if(onRoute && d < NEAR_THRESHOLD) tier = 'near';
+    else if(onRoute && d < EARLY_THRESHOLD) tier = 'far';
+    if(closest === h) closestTier = tier;
+
+    hm.marker.setIcon(pinIcon(h, tier, !onRoute));
+
+    if(onRoute){
+      // Fruehe Vorwarnung, einmalig
+      if(d < EARLY_THRESHOLD && !announced[key].early){
+        announced[key].early = true;
+        // Nur beim allerersten Hinweis dieser Fahrt mit Namen gruessen - danach klingt
+        // es natuerlicher, wenn nicht jedes Mal "Hey Max" wiederholt wird.
+        let core = `${currentT.earlyLead.replace('{d}', Math.round(d))} ${currentT.legend[typeIndex[h.type]]}. ${h[lang]}.`;
+        let msg;
+        if(!hasGreetedThisSession){
+          msg = `${greetPhrase()}, ${core}`;
+          hasGreetedThisSession = true;
+        } else {
+          msg = core.charAt(0).toUpperCase() + core.slice(1);
+        }
+        let junctionText = '';
+        const junction = findNextJunction(lat, lng);
+        if(junction && junction.dist < d){
+          const dirWord = currentT.dirWords[junction.type] || currentT.dirWords['straight'];
+          junctionText = ` ${currentT.junctionLead.replace('{d}', Math.round(junction.dist)).replace('{dir}', dirWord).replace('{s}', junction.street)}`;
+          msg += junctionText;
+        }
+        speak(msg);
+        showToast(`⚠ ${currentT.legend[typeIndex[h.type]]}: ${h[lang]}${junctionText}`, true);
+        showBanner(h, d, 'far');
+        whiteFlash();
+        vibrate([70, 70, 70]); // zweimal kurz: "achtung, da kommt was"
+      }
+      // Nah-Bestaetigung kurz davor - kurz und knapp, ohne erneute Begruessung
+      if(d < NEAR_THRESHOLD && !announced[key].near){
+        announced[key].near = true;
+        const core = `${currentT.nearLead.replace('{d}', Math.round(d))} ${currentT.legend[typeIndex[h.type]]}.`;
+        const msg = core.charAt(0).toUpperCase() + core.slice(1);
+        speak(msg, true); // dringend - darf vordraengeln
+        showBanner(h, d, 'near');
+        whiteFlash();
+        vibrate(d < VERY_NEAR ? [140,60,140,60,200] : [100,60,100]);
+      }
+      if(d < VERY_NEAR && !announced[key].veryNear){
+        announced[key].veryNear = true;
+        flash();
+      }
+    }
+  });
+
+  lastClosest = closest;
+  if(closest){
+    nearestEl.classList.remove('empty');
+    nearestEl.classList.toggle('near', closestTier==='near');
+    nearestEl.classList.toggle('far', closestTier==='far');
+    nearestDist.innerHTML = `${Math.round(closestDist)}<small id="nearestUnit">${currentT.unit}</small>`;
+    nearestType.textContent = currentT.legend[typeIndex[closest.type]];
+    nearestDesc.textContent = closest[lang];
+    document.getElementById('nearestIcon').textContent = closest.icon;
+  } else if(activeHazardKeys && activeHazardKeys.size === 0){
+    nearestEl.classList.add('empty');
+    nearestEl.classList.remove('near','far');
+  }
+}
+
+document.getElementById('trackBtn').addEventListener('click', function(){
+  if(watchId){
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    this.textContent = currentT.trackStart;
+    this.classList.remove('on');
+    if(navModeOn) exitNavMode();
+    return;
+  }
+  if(!navigator.geolocation){
+    showToast("Standort nicht unterstützt / Location not supported");
+    return;
+  }
+  unlockSpeech();
+  this.textContent = currentT.trackStop;
+  this.classList.add('on');
+  hasGreetedThisSession = false;
+  watchId = navigator.geolocation.watchPosition(
+    pos => {
+      updatePosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.heading);
+      // "Von" automatisch mit dem echten Standort fuellen, sobald der erste Fix da ist -
+      // genau wie bei Google Maps, ganz ohne extra Tippen noetig.
+      if(!myLocationCoords && !document.getElementById('fromInput').value.trim()){
+        myLocationCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        document.getElementById('fromInput').value = currentT.myLocationLabel;
+        document.getElementById('useLocBtn').classList.add('active');
+      }
+    },
+    err => showToast("⚠️ " + err.message),
+    {enableHighAccuracy:true, maximumAge:2000}
+  );
+});
+
+document.getElementById('voiceBtn').addEventListener('click', function(){
+  voiceOn = !voiceOn;
+  this.textContent = voiceOn ? currentT.voiceOn : currentT.voiceOff;
+  this.classList.toggle('on', voiceOn);
+});
+
+let demoInterval = null;
+document.getElementById('demoBtn').addEventListener('click', function(){
+  if(demoInterval){
+    clearInterval(demoInterval);
+    demoInterval = null;
+    this.textContent = currentT.demoStart;
+    if(navModeOn && !watchId) exitNavMode();
+    return;
+  }
+  announced = {};
+  hasGreetedThisSession = false;
+  unlockSpeech();
+  this.textContent = currentT.demoStop;
+
+  const path = routeCoords && routeCoords.length > 1
+    ? routeCoords
+    : [[38.895,1.420],[38.935,1.452]];
+
+  let step = 0;
+  // Deutlich langsamer als vorher: die Simulation soll sich wie eine echte Fahrt anfuehlen,
+  // damit die Ansagen ausgesprochen werden koennen und sich nicht gegenseitig abschneiden.
+  const steps = Math.min(400, Math.max(150, path.length));
+  demoInterval = setInterval(()=>{
+    step++;
+    const t = step/steps;
+    const idxF = t*(path.length-1);
+    const i0 = Math.floor(idxF), i1 = Math.min(path.length-1, i0+1);
+    const f = idxF - i0;
+    const la = path[i0][0] + (path[i1][0]-path[i0][0])*f;
+    const ln = path[i0][1] + (path[i1][1]-path[i0][1])*f;
+    updatePosition(la,ln);
+    if(step >= steps){
+      clearInterval(demoInterval);
+      demoInterval = null;
+      document.getElementById('demoBtn').textContent = currentT.demoStart;
+      if(navModeOn && !watchId) exitNavMode();
+    }
+  }, 420);
+});
+
+// Bekannte Orte auf Ibiza mit den Schreibweisen, die Leute tatsaechlich eintippen.
+// Das loest das Problem, dass der Kartendienst "San Antonio" nicht findet, weil der Ort
+// offiziell "Sant Antoni de Portmany" heisst.
+const knownPlaces = [
+  { names:['sant antoni','san antonio','san antoni','sant antonio','portmany'], label:'Sant Antoni de Portmany', lat:38.9807, lng:1.3038 },
+  { names:['ibiza','eivissa','ibiza stadt','ibiza ciudad','ibiza town'], label:'Ibiza (Eivissa)', lat:38.9089, lng:1.4328 },
+  { names:['santa eulalia','santa eularia','santa eulària','santa eulalia del rio'], label:'Santa Eulària des Riu', lat:38.9847, lng:1.5350 },
+  { names:['sant josep','san jose','sant jose','san josep'], label:'Sant Josep de sa Talaia', lat:38.9219, lng:1.2917 },
+  { names:['sant jordi','san jorge'], label:'Sant Jordi de ses Salines', lat:38.8836, lng:1.4083 },
+  { names:['santa gertrudis','santa gertrudis de fruitera'], label:'Santa Gertrudis de Fruitera', lat:39.0033, lng:1.4436 },
+  { names:['sant rafel','san rafael'], label:'Sant Rafel de sa Creu', lat:38.9530, lng:1.3910 },
+  { names:['sant joan','san juan','sant joan de labritja'], label:'Sant Joan de Labritja', lat:39.0778, lng:1.5119 },
+  { names:['sant miquel','san miguel','sant miquel de balansat'], label:'Sant Miquel de Balansat', lat:39.0664, lng:1.4406 },
+  { names:['sant carles','san carlos'], label:'Sant Carles de Peralta', lat:39.0264, lng:1.5747 },
+  { names:['es canar','es cana','cala nova'], label:'Es Canar', lat:39.0069, lng:1.5875 },
+  { names:['playa den bossa','platja den bossa','bossa'], label:"Platja d'en Bossa", lat:38.8850, lng:1.4083 },
+  { names:['cala de bou','cala bou'], label:'Cala de Bou', lat:38.9694, lng:1.2933 },
+  { names:['cala llonga'], label:'Cala Llonga', lat:38.9556, lng:1.5306 },
+  { names:['flughafen','aeropuerto','airport','aeroport'], label:'Flughafen Ibiza', lat:38.8729, lng:1.3731 },
+  { names:['san antonio bay','bahia de san antonio'], label:'Badia de Sant Antoni', lat:38.9833, lng:1.3000 },
+  { names:['figueretas','figueretes'], label:'Figueretes', lat:38.9028, lng:1.4239 },
+  { names:['talamanca'], label:'Talamanca', lat:38.9186, lng:1.4494 },
+  { names:['es vedra','es vedrà'], label:'Es Vedrà', lat:38.8722, lng:1.1994 },
+  { names:['formentera hafen','hafen ibiza','puerto','port'], label:'Hafen Ibiza', lat:38.9111, lng:1.4453 }
+];
+
+// Sucht in der lokalen Ortsliste - unabhaengig von Gross-/Kleinschreibung und Akzenten
+function searchKnownPlaces(query){
+  const q = query.toLowerCase().trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Akzente entfernen
+  if(q.length < 2) return [];
+  return knownPlaces
+    .filter(p => p.names.some(n => {
+      const clean = n.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return clean.startsWith(q) || clean.includes(q);
+    }))
+    .slice(0, 4)
+    .map(p => ({ lat:p.lat, lng:p.lng, main:p.label, sub:'Ibiza', icon:'📍' }));
+}
+
+async function geocode(query){
+  // Erst in der bekannten Ortsliste nachsehen - trifft auch gaengige Schreibweisen
+  // wie "San Antonio" statt "Sant Antoni de Portmany"
+  const known = searchKnownPlaces(query);
+  if(known.length) return { lat: known[0].lat, lng: known[0].lng, label: known[0].main };
+  const viewbox = '1.13,39.13,1.63,38.62';
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Ibiza')}&viewbox=${viewbox}&bounded=1&limit=1`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('geocode failed');
+  const data = await res.json();
+  if(data && data.length > 0){
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), label: data[0].display_name };
+  }
+  return null;
+}
+
+// ---- Live-Adressvorschlaege waehrend des Tippens (wie bei Google Maps) ----
+// toCoords: vom Nutzer per Vorschlag ausgewaehlte Zielkoordinaten (spart erneutes Geokodieren)
+let toCoords = null;
+let suggestDebounce = null;
+
+async function fetchSuggestions(query){
+  if(!query || query.trim().length < 2) return [];
+
+  // Zuerst die bekannten Orte - die sind sofort da und treffen gaengige Schreibweisen
+  const local = searchKnownPlaces(query);
+
+  const viewbox = '1.13,39.13,1.63,38.62';
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${viewbox}&bounded=1&limit=6&addressdetails=1`;
+  try{
+    const res = await fetch(url);
+    if(!res.ok) return local;
+    const data = await res.json();
+    const remote = data.map(d => {
+      const addr = d.address || {};
+      const main = addr.shop || addr.amenity || addr.road || addr.suburb || addr.village || addr.town || d.display_name.split(',')[0];
+      const subParts = [addr.road, addr.suburb || addr.village || addr.town].filter(Boolean).filter(p => p !== main);
+      return {
+        lat: parseFloat(d.lat), lng: parseFloat(d.lon),
+        main, sub: subParts.join(', ') || 'Ibiza',
+        icon: addr.shop ? '🛒' : (addr.amenity ? '📍' : '🛣️')
+      };
+    });
+    // Bekannte Orte zuerst, dann die Treffer vom Kartendienst - ohne Doppelte
+    const seen = new Set(local.map(x => x.main.toLowerCase()));
+    const merged = local.concat(remote.filter(r => !seen.has(r.main.toLowerCase())));
+    return merged.slice(0, 7);
+  } catch(e){ return local; }
+}
+
+function renderSuggestions(listEl, items, inputEl, coordsSetter){
+  listEl.innerHTML = '';
+  if(!items.length){ listEl.classList.remove('show'); return; }
+  items.forEach(item=>{
+    const div = document.createElement('div');
+    div.className = 'suggestItem';
+    div.innerHTML = `<span class="sIco">${item.icon}</span><span class="sText"><div class="sMain"></div><div class="sSub"></div></span>`;
+    div.querySelector('.sMain').textContent = item.main;
+    div.querySelector('.sSub').textContent = item.sub;
+    div.addEventListener('click', ()=>{
+      inputEl.value = item.main;
+      coordsSetter({lat:item.lat, lng:item.lng});
+      listEl.classList.remove('show');
+    });
+    listEl.appendChild(div);
+  });
+  listEl.classList.add('show');
+}
+
+function setupAutocomplete(inputId, listId, coordsSetter){
+  const inputEl = document.getElementById(inputId);
+  const listEl = document.getElementById(listId);
+  inputEl.addEventListener('input', function(){
+    coordsSetter(null); // manuelle Eingabe macht eine evtl. vorher gewaehlte Auswahl ungueltig
+    clearTimeout(suggestDebounce);
+    const q = this.value.trim();
+    if(q.length < 2){ listEl.classList.remove('show'); return; }
+
+    // Bekannte Orte sofort anzeigen - ohne Wartezeit, ohne Internet
+    const instant = searchKnownPlaces(q);
+    if(instant.length){
+      renderSuggestions(listEl, instant, inputEl, coordsSetter);
+    } else {
+      listEl.innerHTML = `<div class="suggestItem" style="opacity:0.6;"><span class="sIco">⏳</span><span class="sText"><div class="sMain">${currentT.searchingSuggest}</div></span></div>`;
+      listEl.classList.add('show');
+    }
+
+    // Danach die vollstaendige Suche nachladen und die Liste ergaenzen
+    suggestDebounce = setTimeout(async ()=>{
+      if(inputEl.value.trim() !== q) return; // Nutzer tippt schon weiter - Ergebnis verwerfen
+      const items = await fetchSuggestions(q);
+      if(items.length === 0){
+        listEl.innerHTML = `<div class="suggestItem" style="opacity:0.6;"><span class="sIco">🤷</span><span class="sText"><div class="sMain">${currentT.noSuggest}</div></span></div>`;
+        listEl.classList.add('show');
+      } else {
+        renderSuggestions(listEl, items, inputEl, coordsSetter);
+      }
+    }, 450);
+  });
+  inputEl.addEventListener('blur', ()=>{
+    setTimeout(()=> listEl.classList.remove('show'), 150); // Klick auf Vorschlag noch zulassen
+  });
+}
+
+function distPointToRoute(lat, lng, coords){
+  let min = Infinity;
+  for(let i=0;i<coords.length;i++){
+    const d = haversine(lat,lng,coords[i][0],coords[i][1]);
+    if(d<min) min = d;
+  }
+  return min;
+}
+
+function clearRoute(){
+  if(routeLine){ map.removeLayer(routeLine); routeLine=null; }
+  if(routeGlow){ map.removeLayer(routeGlow); routeGlow=null; }
+  if(startMarker){ map.removeLayer(startMarker); startMarker=null; }
+  if(endMarker){ map.removeLayer(endMarker); endMarker=null; }
+  routeCoords = null;
+  destCoords = null;
+  routeSteps = [];
+  myLocationCoords = null;
+  toCoords = null;
+  document.getElementById('useLocBtn').classList.remove('active');
+  activeHazardKeys = null;
+  routeBadge.classList.remove('show');
+  document.getElementById('clearRouteBtn').style.display = 'none';
+  routeStatus.textContent = '';
+  routeStatus.className = 'routeStatus';
+  hazardMarkers.forEach(hm=>{ hm.marker.setIcon(pinIcon(hm.hazard, null, false)); });
+  announced = {};
+  hasGreetedThisSession = false;
+  lastClosest = null;
+  nearestEl.classList.add('empty');
+  nearestEl.classList.remove('near','far');
+  nearestType.textContent = currentT.noLocationType;
+  nearestDesc.textContent = currentT.noLocationDesc;
+  if(!watchId) document.getElementById('trackBtn').textContent = currentT.trackStart;
+  document.getElementById('nearestIcon').textContent = '📡';
+}
+
+// Berechnet eine Route zwischen zwei Punkten (per OSRM) und zeichnet sie auf der Karte.
+// Wird sowohl beim ersten Berechnen als auch beim automatischen Neu-Routen genutzt.
+// Zwei Server als Rueckfallebene: der Demo-Routendienst erlaubt nur eine Anfrage pro
+// Sekunde - bei viel Testen kommt sonst kurzzeitig gar keine Antwort mehr.
+const ROUTE_SERVERS = [
+  'https://router.project-osrm.org',
+  'https://routing.openstreetmap.de/routed-car'
+];
+
+async function fetchRouteData(startLat, startLng, endLat, endLng){
+  let lastError = null;
+  for(const base of ROUTE_SERVERS){
+    const url = `${base}/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&steps=true`;
+    try{
+      const res = await fetch(url);
+      if(!res.ok){ lastError = 'HTTP ' + res.status; continue; }
+      const data = await res.json();
+      if(data.routes && data.routes.length) return data;
+      lastError = data.message || 'keine Route';
+    } catch(e){
+      lastError = e.message;
+    }
+    await new Promise(r => setTimeout(r, 600)); // kurz warten vor dem naechsten Server
+  }
+  console.warn('Routing fehlgeschlagen:', lastError);
+  return null;
+}
+
+async function fetchAndDrawRoute(startLat, startLng, endLat, endLng, silent){
+  const data = await fetchRouteData(startLat, startLng, endLat, endLng);
+  if(!data) return false;
+
+  const coords = data.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+  routeCoords = coords;
+  navAnnounced = {};
+
+  // Echte Kreuzungen/Abzweigungen entlang der Route (von OSRM), fuer "Abzweigung in Xm"-Ansagen
+  // Wichtig: Kreisverkehre und ihre Ausfahrtnummer separat merken - "leicht rechts" waere
+  // dort irrefuehrend, gebraucht wird "im Kreisverkehr die 2. Ausfahrt".
+  routeSteps = [];
+  (data.routes[0].legs || []).forEach(leg=>{
+    (leg.steps || []).forEach(step=>{
+      if(step.maneuver && step.maneuver.location && step.name){
+        routeSteps.push({
+          lat: step.maneuver.location[1],
+          lng: step.maneuver.location[0],
+          street: step.name,
+          type: step.maneuver.modifier || step.maneuver.type || '',
+          maneuverType: step.maneuver.type || '',        // z.B. 'roundabout', 'turn', 'fork'
+          exitNumber: step.maneuver.exit || null,         // Ausfahrtnummer im Kreisverkehr
+          roadClass: (step.intersections && step.intersections[0] && step.intersections[0].classes)
+                      ? step.intersections[0].classes : []
+        });
+      }
+    });
+  });
+
+  if(routeLine) map.removeLayer(routeLine);
+  if(routeGlow) map.removeLayer(routeGlow);
+  if(startMarker) map.removeLayer(startMarker);
+  if(endMarker) map.removeLayer(endMarker);
+
+  // Zwei uebereinanderliegende Linien erzeugen einen Leucht-Effekt: breite, weiche
+  // Aussenlinie plus schmale, kraeftige Innenlinie. Auf der dunklen Karte sticht die
+  // eigene Route dadurch klar hervor, waehrend die Umgebung zurueckhaltend bleibt.
+  routeGlow = L.polyline(coords, {
+    color:'#4FC3FF', weight:16, opacity:0.28, lineCap:'round', lineJoin:'round'
+  }).addTo(map);
+  routeLine = L.polyline(coords, {
+    color:'#2F9BFF', weight:7, opacity:1, lineCap:'round', lineJoin:'round'
+  }).addTo(map);
+
+  startMarker = L.circleMarker(coords[0], {radius:8, color:'#fff', fillColor:'#16B27A', fillOpacity:1, weight:3}).addTo(map);
+  endMarker = L.circleMarker(coords[coords.length-1], {radius:8, color:'#fff', fillColor:'#EF4444', fillOpacity:1, weight:3}).addTo(map);
+  if(!silent) map.fitBounds(routeLine.getBounds(), {padding:[40,40]});
+
+  activeHazardKeys = new Set();
+  hazardMarkers.forEach(hm=>{
+    const d = distPointToRoute(hm.hazard.lat, hm.hazard.lng, coords);
+    const onRoute = d <= ROUTE_BUFFER_M;
+    if(onRoute) activeHazardKeys.add(hazardKey(hm.hazard));
+    hm.marker.setIcon(pinIcon(hm.hazard, null, !onRoute));
+  });
+
+  const minutes = Math.round(data.routes[0].duration/60);
+  return { km: (data.routes[0].distance/1000).toFixed(1), count: activeHazardKeys.size, minutes };
+}
+
+// Findet die naechste echte Kreuzung/Abzweigung (aus den OSRM-Routendaten) in der Naehe
+// der aktuellen Position - fuer den Hinweis "naechste Abzweigmoeglichkeit in Xm: Strassenname"
+function findNextJunction(lat, lng){
+  if(!routeSteps.length) return null;
+  let best = null, bestDist = Infinity;
+  routeSteps.forEach(s=>{
+    const d = haversine(lat, lng, s.lat, s.lng);
+    if(d < bestDist && d < 1200){ bestDist = d; best = s; }
+  });
+  if(!best) return null;
+  return { street: best.street, dist: bestDist, type: best.type };
+}
+
+// ---- Navigations-Modus: Vollbild-Ansicht mit Abbiege-Banner, wie bei Google Maps ----
+let navModeOn = false;
+const arrowIcons = {
+  'straight':'⬆', 'continue':'⬆',
+  'left':'⬅', 'slight left':'↖', 'sharp left':'↙',
+  'right':'➡', 'slight right':'↗', 'sharp right':'↘',
+  'uturn':'↩'
+};
+function arrowFor(type){ return arrowIcons[type] || '⬆'; }
+
+function enterNavMode(){
+  if(navModeOn) return;
+  navModeOn = true;
+  document.querySelector('.app').classList.add('navMode');
+  navLayerMode = 0;          // dunkle Navi-Karte als Standard
+  applyNavLayer(navLayerMode);
+  map.setZoom(17);
+
+  // Begruessung + erste Richtungsansage beim Losfahren, wie bei Google Maps.
+  // Kurz verzoegert, damit die Route/Schritte sicher geladen sind.
+  setTimeout(()=>{
+    const greet = greetPhrase();
+    let msg = `${greet}, ${currentT.navStartSpeech}`;
+    if(routeSteps.length){
+      const first = routeSteps.find(s => s.street) || routeSteps[0];
+      if(first && first.street){
+        msg += ` ${currentT.navStartStreet.replace('{s}', first.street)}`;
+      }
+    }
+
+    // Warnungen auf der Route einzeln nach Typ aufzaehlen, damit von Anfang an klar ist,
+    // was einen erwartet - statt nur einer nackten Zahl.
+    if(activeHazardKeys && activeHazardKeys.size > 0){
+      const counts = {};
+      hazards.forEach(h=>{
+        if(activeHazardKeys.has(hazardKey(h))){
+          const label = currentT.legend[typeIndex[h.type]];
+          counts[label] = (counts[label] || 0) + 1;
+        }
+      });
+      const parts = Object.entries(counts).map(([label, n]) => n > 1 ? `${n} × ${label}` : label);
+      msg += ` ${currentT.navStartList.replace('{list}', parts.join(', '))}`;
+    } else {
+      msg += ` ${currentT.navStartClear}`;
+    }
+
+    speak(msg);
+    hasGreetedThisSession = true; // spaetere Warnungen dann ohne erneute Begruessung
+    lastStatusUpdate = Date.now();
+
+    // Einmalige Kurz-Einweisung: zeigt, wofuer die Knoepfe rechts da sind.
+    // Laeuft nur beim allerersten Start, danach nie wieder (waere sonst nervig).
+    if(!tutorialShown){
+      tutorialShown = true;
+      setTimeout(runQuickTutorial, 5200); // erst nach der Startansage, damit nichts kollidiert
+    }
+  }, 900);
+}
+
+// Zeigt nacheinander kurz die wichtigsten Knoepfe, mit Lichtkegel + kurzem Text + Ansage
+let tutorialShown = false;
+function runQuickTutorial(){
+  const steps = [
+    { id:'quickBlitzer', icon:'📷', text: currentT.tutReport, speech: currentT.tutReportSpeech },
+    { id:'navMicBtn',    icon:'🎤', text: currentT.tutMic,    speech: currentT.tutMicSpeech },
+    { id:'navExitBtn',   icon:'✕',  text: currentT.tutExit,   speech: currentT.tutExitSpeech }
+  ];
+  const overlay = document.getElementById('tutorialOverlay');
+  const spot = document.getElementById('tutorialSpotlight');
+  const bubble = document.getElementById('tutorialBubble');
+  const tutIcon = document.getElementById('tutIcon');
+  const tutText = document.getElementById('tutText');
+
+  overlay.classList.add('show');
+  let i = 0;
+
+  function showStep(){
+    if(i >= steps.length){
+      overlay.classList.remove('show');
+      spot.classList.remove('on');
+      return;
+    }
+    const step = steps[i];
+    const el = document.getElementById(step.id);
+    if(!el){ i++; showStep(); return; }
+
+    const r = el.getBoundingClientRect();
+    const size = Math.max(r.width, r.height) + 16;
+    spot.style.width = `${size}px`;
+    spot.style.height = `${size}px`;
+    spot.style.left = `${r.left + r.width/2 - size/2}px`;
+    spot.style.top = `${r.top + r.height/2 - size/2}px`;
+    spot.classList.add('on');
+
+    tutIcon.textContent = step.icon;
+    tutText.textContent = step.text;
+    // Blase oberhalb/unterhalb des Knopfes platzieren, je nachdem wo Platz ist
+    bubble.style.top = `${Math.max(80, r.top + r.height/2 - 40)}px`;
+    bubble.style.transform = 'none';
+
+    speak(step.speech);
+    vibrate([30, 40, 30]); // sanftes Doppel-Tippen, passend zum hervorgehobenen Knopf
+    i++;
+    // Anzeigedauer an die Laenge der Ansage anpassen, damit nichts abgeschnitten wirkt
+    const holdMs = Math.max(3200, Math.min(9000, step.speech.length * 62));
+    setTimeout(showStep, holdMs);
+  }
+  showStep();
+}
+function exitNavMode(){
+  navModeOn = false;
+  document.querySelector('.app').classList.remove('navMode');
+  // Zurueck zur hellen Uebersichtskarte ausserhalb der Navigation
+  map.removeLayer(darkNavLayer);
+  map.removeLayer(satLayer);
+  map.removeLayer(labelsLayer);
+  if(!map.hasLayer(streetLayer)) streetLayer.addTo(map);
+  closeFollow = false;
+  const rb = document.getElementById('navRecenterBtn');
+  if(rb) rb.classList.remove('following');
+}
+
+// Ermittelt die naechsten zwei noch bevorstehenden Abbiegungen (in Fahrtrichtung) und
+// zeigt sie im gruenen Banner ("Richtung ...") sowie im kleinen "Dann"-Hinweis an.
+function updateNavBanner(lat, lng){
+  if(!routeSteps.length) return;
+  // Naechste noch nicht erreichte Kreuzung finden (die naeheste, die noch vor uns liegt)
+  let upcoming = routeSteps
+    .map((s,i) => ({ ...s, d: haversine(lat, lng, s.lat, s.lng), idx: i }))
+    .filter(s => s.d > 15) // schon passierte/zu nahe Punkte ausblenden
+    .sort((a,b)=>a.d-b.d);
+
+  if(upcoming.length === 0) return;
+  const next = upcoming[0];
+  const after = upcoming[1];
+
+  const arrowEl = document.getElementById('navArrow');
+  const nextIsRoundabout = next.maneuverType === 'roundabout' || next.maneuverType === 'rotary';
+  arrowEl.textContent = nextIsRoundabout ? '🔄' : arrowFor(next.type);
+  document.getElementById('navStreet').textContent = next.street || '–';
+  // Bei Kreisverkehren die Ausfahrtnummer direkt mit anzeigen
+  const labelText = (nextIsRoundabout && next.exitNumber)
+    ? currentT.navRoundaboutLabel.replace('{d}', Math.round(next.d)).replace('{n}', next.exitNumber)
+    : currentT.navToward.replace('{d}', Math.round(next.d));
+  document.getElementById('navLabel').textContent = labelText;
+
+  if(after){
+    document.getElementById('navNext').style.display = 'flex';
+    const afterIsRoundabout = after.maneuverType === 'roundabout' || after.maneuverType === 'rotary';
+    document.getElementById('navNextArrow').textContent = afterIsRoundabout ? '🔄' : arrowFor(after.type);
+  } else {
+    document.getElementById('navNext').style.display = 'none';
+  }
+
+  // Pfeil wird groesser, je naeher die Abbiegung kommt (wie bei Google Maps)
+  const dist = next.d;
+  nextTurnDistance = dist; // fuer die Kamera-Priorisierung merken
+  let scale = 1;
+  if(dist < 400){
+    scale = 1 + (1 - Math.max(0, Math.min(1, dist/400))) * 0.7; // bis zu 1.7x bei sehr nah
+  }
+  arrowEl.style.fontSize = `${Math.round(34*scale)}px`;
+
+  // Karte folgt live der eigenen Position und zoomt naeher heran, je naeher die naechste
+  // Abbiegung ist - wie bei Google Maps. Etwas weniger nah als vorher, damit man auch die
+  // naechsten Nebenstrassen noch sieht, nicht nur die einzelnen Haeuser direkt vor einem.
+  // Je naeher die Abbiegung, desto naeher die Karte. Bei kurz bevorstehenden Abbiegungen
+  // sehr nah heranzoomen, damit auch kleine Seitenstrassen klar erkennbar sind und man
+  // die richtige Abzweigung nicht verpasst.
+  let targetZoom = 16;
+  if(dist < 60) targetZoom = 19.5;
+  else if(dist < 120) targetZoom = 19;
+  else if(dist < 250) targetZoom = 18.5;
+  else if(dist < 450) targetZoom = 17.5;
+  else if(dist < 900) targetZoom = 16.5;
+  else targetZoom = 15.5;
+
+  // In der Nahansicht ("Zentrieren" aktiv) naeher dran bleiben und nach vorne blicken.
+  // Waehrend der kurzen Warnungs-Uebersicht bleibt die Kamera stehen, damit man
+  // die Lage in Ruhe sehen kann - danach uebernimmt die Verfolgung wieder.
+  if(Date.now() > cameraHoldUntil){
+    if(closeFollow || viewMode === 1){
+      centerWithLookAhead(lat, lng, Math.max(targetZoom, 17));
+    } else if(viewMode === 2){
+      map.setView([lat, lng], 14, {animate:true});
+    } else {
+      map.setView([lat, lng], targetZoom, {animate:true});
+    }
+  }
+
+  // ---- Sprachansage der Abbiegung selbst, wie bei Google Maps/Waze ----
+  // Erkennt Kreisverkehre (inkl. Ausfahrtnummer) und kleine Nebenwege, damit die Ansage
+  // wirklich zu dem passt, was man vor sich sieht - statt nur "leicht rechts".
+  const isRoundabout = next.maneuverType === 'roundabout' || next.maneuverType === 'rotary';
+  const isRealTurn = isRoundabout ||
+    (next.type && next.type !== 'straight' && next.type !== 'continue' && next.type !== '');
+
+  if(isRealTurn){
+    if(!navAnnounced[next.idx]) navAnnounced[next.idx] = {far:false, now:false};
+
+    // Baut die passende Beschreibung des Manoevers zusammen
+    function maneuverPhrase(withDistance){
+      if(isRoundabout){
+        if(next.exitNumber){
+          return withDistance
+            ? currentT.roundaboutSoon.replace('{d}', Math.round(dist)).replace('{n}', next.exitNumber).replace('{s}', next.street || '')
+            : currentT.roundaboutNow.replace('{n}', next.exitNumber);
+        }
+        return withDistance
+          ? currentT.roundaboutSoonNoExit.replace('{d}', Math.round(dist)).replace('{s}', next.street || '')
+          : currentT.roundaboutNowNoExit;
+      }
+      const dirWord = currentT.dirWords[next.type] || next.type;
+      // Nur warnen, wenn die Abzweigung wirklich leicht zu uebersehen ist
+      // (scharfe Abbiegung in einen unbenannten/sehr kleinen Weg) - nicht bei jeder Kurve.
+      const isEasyToMiss = (next.type === 'sharp right' || next.type === 'sharp left')
+                            && (!next.street || next.street.length < 12);
+      const roadHint = isEasyToMiss ? ` ${currentT.easyToMissHint}` : '';
+      return withDistance
+        ? currentT.turnSoon.replace('{d}', Math.round(dist)).replace('{dir}', dirWord).replace('{s}', next.street || '') + roadHint
+        : currentT.turnNow.replace('{dir}', dirWord);
+    }
+
+    if(dist < 250 && !navAnnounced[next.idx].far){
+      navAnnounced[next.idx].far = true;
+      speak(maneuverPhrase(true));
+    }
+    if(dist < 40 && !navAnnounced[next.idx].now){
+      navAnnounced[next.idx].now = true;
+      speak(maneuverPhrase(false), true); // dringend - darf vordraengeln
+    }
+  }
+}
+
+function updateNavEta(lat, lng){
+  if(!routeCoords || !routeCoords.length) return;
+  // Reststrecke ab der aktuellen Position bis zum Streckenende summieren
+  let closestIdx = 0, closestD = Infinity;
+  routeCoords.forEach((c,i)=>{
+    const d = haversine(lat, lng, c[0], c[1]);
+    if(d < closestD){ closestD = d; closestIdx = i; }
+  });
+  let remaining = 0;
+  for(let i=closestIdx; i<routeCoords.length-1; i++){
+    remaining += haversine(routeCoords[i][0], routeCoords[i][1], routeCoords[i+1][0], routeCoords[i+1][1]);
+  }
+  const km = remaining/1000;
+  const avgSpeedKmh = 38; // grobe Schaetzung fuer Motorrad auf Landstrassen, nur Richtwert
+  const minutes = Math.max(1, Math.round((km/avgSpeedKmh)*60));
+  document.getElementById('navEtaTime').textContent = `${minutes} min`;
+  document.getElementById('navEtaDist').textContent = `${km.toFixed(1)} km`;
+
+  maybeStatusUpdate(lat, lng, km, minutes);
+}
+
+// Regelmaessige Zwischenmeldung waehrend der Fahrt ("alles frei" oder "als naechstes kommt ...")
+// damit man weiss, dass die App noch mitdenkt, statt einfach still zu sein.
+const STATUS_INTERVAL_MS = 150000; // alle 2,5 Minuten - oft genug, ohne zu nerven
+function maybeStatusUpdate(lat, lng, kmLeft, minLeft){
+  if(!navModeOn) return;
+  const now = Date.now();
+  if(now - lastStatusUpdate < STATUS_INTERVAL_MS) return;
+  lastStatusUpdate = now;
+
+  // Naechste noch bevorstehende Warnung auf der Route suchen
+  let nextHazard = null, nextDist = Infinity;
+  hazardMarkers.forEach(hm=>{
+    const h = hm.hazard;
+    if(activeHazardKeys && !activeHazardKeys.has(hazardKey(h))) return;
+    const d = haversine(lat, lng, h.lat, h.lng);
+    // nur was noch vor uns liegt und noch nicht angesagt wurde
+    if(d < nextDist && d > NEAR_THRESHOLD){ nextDist = d; nextHazard = h; }
+  });
+
+  if(nextHazard){
+    speak(currentT.statusNext
+      .replace('{d}', Math.round(nextDist))
+      .replace('{t}', currentT.legend[typeIndex[nextHazard.type]]));
+  } else {
+    speak(currentT.statusClear.replace('{min}', minLeft).replace('{km}', kmLeft.toFixed(1)));
+  }
+}
+
+document.getElementById('navExitBtn').addEventListener('click', function(){
+  document.getElementById('trackBtn').click(); // stoppt GPS-Verfolgung
+  exitNavMode();
+});
+// Zentrieren-Knopf: schaltet durch drei Ansichten - Standard, Nah (Blick nach vorn)
+// und Weit (Ueberblick). Jeder Druck geht eine Stufe weiter, dann wieder von vorn.
+// 0 = Standard, 1 = Nah mit Blick nach vorn, 2 = Weiter Ueberblick
+document.getElementById('navRecenterBtn').addEventListener('click', function(){
+  viewMode = (viewMode + 1) % 3;
+  closeFollow = (viewMode === 1); // nur in Stufe 1 wird nach vorn geblickt
+  this.classList.toggle('following', viewMode !== 0);
+  applyViewMode();
+  const labels = [currentT.viewNormal, currentT.followOn, currentT.viewWide];
+  showToast('➤ ' + labels[viewMode]);
+});
+
+// Wendet die gewaehlte Ansicht auf die aktuelle Position an
+function applyViewMode(){
+  if(!userMarker) return;
+  const p = userMarker.getLatLng();
+  if(viewMode === 1){
+    centerWithLookAhead(p.lat, p.lng, 18);       // nah dran, Strasse vor sich im Blick
+  } else if(viewMode === 2){
+    map.setView(p, 14, {animate:true});          // weiter Ueberblick
+  } else {
+    map.setView(p, 16, {animate:true});          // Standard
+  }
+}
+
+// Setzt die Karte so, dass der eigene Punkt weiter unten sitzt und man nach vorne schaut
+function centerWithLookAhead(lat, lng, zoom){
+  const targetZoom = zoom || map.getZoom();
+  const point = map.project([lat, lng], targetZoom);
+  // Punkt um ca. 26% der Bildschirmhoehe nach unten verschieben - mehr Strecke voraus
+  point.y -= map.getSize().y * 0.26;
+  const shifted = map.unproject(point, targetZoom);
+  map.setView(shifted, targetZoom, {animate:true});
+}
+
+document.getElementById('navMuteBtn').addEventListener('click', function(){
+  document.getElementById('voiceBtn').click(); // nutzt denselben Ton-an/aus-Schalter
+  const btn = document.getElementById('navMuteBtn');
+  btn.textContent = voiceOn ? '🔊' : '🔇';
+  btn.classList.toggle('muted', !voiceOn);
+});
+
+// Vier Kartenansichten zum Durchklicken:
+// dunkle Navi-Karte (Standard) -> Satellit -> Hybrid -> helle Strassenkarte
+let navLayerMode = 0; // 0=dunkel, 1=Satellit, 2=Hybrid, 3=hell
+const navLayerIcons = ['🌙', '🛰️', '🗺️', '☀️'];
+function applyNavLayer(mode){
+  map.removeLayer(darkNavLayer);
+  map.removeLayer(satLayer);
+  map.removeLayer(labelsLayer);
+  map.removeLayer(streetLayer);
+  if(mode === 0){ darkNavLayer.addTo(map); }
+  else if(mode === 1){ satLayer.addTo(map); }
+  else if(mode === 2){ satLayer.addTo(map); labelsLayer.addTo(map); }
+  else { streetLayer.addTo(map); }
+  // Route und Markierungen immer oben halten, damit sie nie von Kacheln verdeckt werden
+  if(routeGlow) routeGlow.bringToFront();
+  if(routeLine) routeLine.bringToFront();
+  if(userMarker) userMarker.bringToFront();
+  document.getElementById('navLayerBtn').textContent = navLayerIcons[mode];
+}
+document.getElementById('navLayerBtn').addEventListener('click', function(){
+  navLayerMode = (navLayerMode + 1) % 4;
+  applyNavLayer(navLayerMode);
+});
+
+// ---- Eigene Meldungen: Nutzer meldet, was er gerade sieht (Waze-Prinzip) ----
+// Diese Daten gehoeren dir selbst - unabhaengig von externen Quellen.
+// Ein einziger Tipp genuegt (wichtig beim Fahren), mit spuerbarer und sichtbarer Bestaetigung.
+function addUserReport(type, btnEl){
+  const pos = userMarker ? userMarker.getLatLng() : map.getCenter();
+  const icons = {blitzer:'📷', baustelle:'🚧', unfall:'⚠️', sperre:'⛔'};
+  const label = currentT.legend[typeIndex[type]];
+
+  const newHazard = {
+    lat: pos.lat, lng: pos.lng, type, icon: icons[type],
+    original: `${label} (${currentT.reportedByYou})`,
+    de: `${ui.de.legend[typeIndex[type]]} (${ui.de.reportedByYou})`,
+    en: `${ui.en.legend[typeIndex[type]]} (${ui.en.reportedByYou})`,
+    es: `${ui.es.legend[typeIndex[type]]} (${ui.es.reportedByYou})`,
+    it: `${ui.it.legend[typeIndex[type]]} (${ui.it.reportedByYou})`,
+    nl: `${ui.nl.legend[typeIndex[type]]} (${ui.nl.reportedByYou})`,
+    userReported: true,
+    reportedAt: Date.now()
+  };
+  hazards.push(newHazard);
+
+  const marker = L.marker([newHazard.lat, newHazard.lng], {icon:pinIcon(newHazard, null, false)})
+    .addTo(map).bindPopup(popupHtml(newHazard));
+  hazardMarkers.push({hazard:newHazard, marker});
+  // Als bereits angesagt markieren, damit die App einem nicht die eigene Meldung vorliest
+  announced[hazardKey(newHazard)] = {early:true, near:true, veryNear:true};
+  if(activeHazardKeys) activeHazardKeys.add(hazardKey(newHazard));
+
+  // --- Bestaetigung: spuerbar (Vibration), sichtbar (Knopf + gruener Blitz), hoerbar ---
+  vibrate([40, 50, 90]);
+  if(btnEl){
+    btnEl.classList.remove('confirmed');
+    void btnEl.offsetWidth; // Animation neu starten
+    btnEl.classList.add('confirmed');
+  }
+  const cf = document.getElementById('confirmFlash');
+  cf.classList.remove('flash');
+  void cf.offsetWidth;
+  cf.classList.add('flash');
+
+  showToast(`✅ ${currentT.reportThanks.replace('{t}', label)}`);
+  renderIslandStatus(); // Uebersicht auf dem Startbildschirm aktuell halten
+  speak(currentT.reportSpoken.replace('{t}', label));
+}
+
+document.querySelectorAll('.quickBtn').forEach(btn=>{
+  btn.addEventListener('click', function(){
+    addUserReport(this.getAttribute('data-type'), this);
+  });
+});
+
+// ---- Sprachbefehle (optional, an/aus per Mikrofon-Knopf) ----
+// Gedacht fuers Motorradfahren: Handy in der Tasche, Meldung per Zuruf statt Tippen.
+// Bewusst abschaltbar, weil dauerhaftes Zuhoeren Akku kostet und nicht jeder das will.
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let listening = false;
+
+// Welche gesprochenen Woerter welcher Meldungsart entsprechen (je Sprache)
+const voiceKeywords = {
+  de: {blitzer:['blitzer','radar','kontrolle','polizei'], baustelle:['baustelle','bauarbeiten'], unfall:['unfall','crash'], sperre:['sperrung','gesperrt','straßensperre','strassensperre']},
+  en: {blitzer:['speed camera','radar','police','control'], baustelle:['roadworks','construction'], unfall:['accident','crash'], sperre:['closed','road closure','blocked']},
+  es: {blitzer:['radar','control','policía','policia'], baustelle:['obras'], unfall:['accidente'], sperre:['cortada','corte','cerrada']},
+  it: {blitzer:['autovelox','radar','polizia','controllo'], baustelle:['lavori'], unfall:['incidente'], sperre:['chiusa','chiusura']},
+  nl: {blitzer:['flitser','radar','politie','controle'], baustelle:['wegwerkzaamheden','werkzaamheden'], unfall:['ongeval','ongeluk'], sperre:['afgesloten','wegafsluiting']}
+};
+
+function matchVoiceCommand(transcript){
+  const text = transcript.toLowerCase();
+  const words = voiceKeywords[lang] || voiceKeywords.de;
+  for(const [type, keys] of Object.entries(words)){
+    if(keys.some(k => text.includes(k))) return type;
+  }
+  return null;
+}
+
+function startListening(){
+  if(!SpeechRec){
+    showToast('⚠️ ' + currentT.micUnsupported);
+    return;
+  }
+  recognition = new SpeechRec();
+  recognition.lang = currentT.speechLang;
+  recognition.continuous = true;
+  recognition.interimResults = false;
+
+  recognition.onresult = (event)=>{
+    const last = event.results[event.results.length - 1];
+    const transcript = last[0].transcript;
+    const type = matchVoiceCommand(transcript);
+    if(type){
+      addUserReport(type, document.querySelector(`.quickBtn[data-type="${type}"]`));
+    }
+  };
+  recognition.onerror = ()=>{ /* Fehler still ignorieren, laeuft im Hintergrund weiter */ };
+  recognition.onend = ()=>{
+    // Falls die Erkennung von selbst stoppt (passiert regelmaessig), neu starten
+    if(listening){ try{ recognition.start(); } catch(e){} }
+  };
+
+  try{
+    recognition.start();
+    listening = true;
+    document.getElementById('navMicBtn').classList.add('listening');
+    showToast('🎤 ' + currentT.micOn);
+    speak(currentT.micOnSpoken);
+  } catch(e){
+    showToast('⚠️ ' + currentT.micUnsupported);
+  }
+}
+
+function stopListening(){
+  listening = false;
+  if(recognition){ try{ recognition.stop(); } catch(e){} }
+  document.getElementById('navMicBtn').classList.remove('listening');
+  showToast('🎤 ' + currentT.micOff);
+}
+
+document.getElementById('navMicBtn').addEventListener('click', function(){
+  if(listening) stopListening(); else startListening();
+});
+
+// Das ausfuehrlichere Auswahlfenster bleibt als Reserve fuer weitere Meldungsarten
+document.getElementById('reportCancel').addEventListener('click', function(){
+  document.getElementById('reportSheet').classList.remove('show');
+});
+document.querySelectorAll('.reportOpt').forEach(btn=>{
+  btn.addEventListener('click', function(){
+    addUserReport(this.getAttribute('data-type'), null);
+    document.getElementById('reportSheet').classList.remove('show');
+  });
+});
+
+
+// Prueft bei jedem Standort-Update, ob wir von der Route abgekommen sind,
+// und berechnet dann automatisch eine neue Route zum selben Ziel (wie bei Google Maps).
+async function maybeReroute(lat, lng){
+  if(!routeCoords || !destCoords || isRerouting) return;
+  const now = Date.now();
+  if(now - lastRerouteAttempt < REROUTE_COOLDOWN_MS) return;
+
+  const d = distPointToRoute(lat, lng, routeCoords);
+  if(d < OFF_ROUTE_THRESHOLD_M) return;
+
+  isRerouting = true;
+  lastRerouteAttempt = now;
+  routeStatus.textContent = currentT.rerouting;
+  routeStatus.className = 'routeStatus active';
+  showToast(`↻ ${currentT.rerouting}`);
+
+  try{
+    const result = await fetchAndDrawRoute(lat, lng, destCoords.lat, destCoords.lng, true);
+    if(result){
+      routeStatus.textContent = currentT.rerouted(result.count, result.km);
+      routeStatus.className = 'routeStatus active';
+      routeBadge.textContent = currentT.routeBadge(result.count);
+      speak(currentT.reroutedSpeech);
+      announced = {};
+    }
+  } catch(e){
+    // still leise scheitern - bestehende Route bleibt einfach bestehen
+  } finally {
+    isRerouting = false;
+  }
+}
+
+async function computeRoute(){
+  const fromVal = document.getElementById('fromInput').value.trim();
+  const toVal = document.getElementById('toInput').value.trim();
+  if((!fromVal && !myLocationCoords) || !toVal){
+    routeStatus.textContent = currentT.needBoth;
+    routeStatus.className = 'routeStatus err';
+    return;
+  }
+  routeStatus.textContent = currentT.searching;
+  routeStatus.className = 'routeStatus active';
+  document.getElementById('routeGoBtn').disabled = true;
+
+  try{
+    // Wenn "Meinen Standort verwenden" aktiv ist, den echten GPS-Punkt nehmen statt
+    // eine Adresse zu suchen - wichtig, wenn man nicht weiss, wie der eigene Ort heisst.
+    const startPromise = myLocationCoords ? Promise.resolve(myLocationCoords) : geocode(fromVal);
+    // Wenn schon ein Vorschlag ausgewaehlt wurde, dessen Koordinaten direkt nehmen
+    const endPromise = toCoords ? Promise.resolve(toCoords) : geocode(toVal);
+    const [start, end] = await Promise.all([startPromise, endPromise]);
+    // Genau sagen, welche der beiden Adressen nicht gefunden wurde
+    if(!start && !end){
+      routeStatus.textContent = currentT.notFound;
+      routeStatus.className = 'routeStatus err'; return;
+    }
+    if(!start){
+      routeStatus.textContent = currentT.notFoundStart;
+      routeStatus.className = 'routeStatus err'; return;
+    }
+    if(!end){
+      routeStatus.textContent = currentT.notFoundEnd;
+      routeStatus.className = 'routeStatus err'; return;
+    }
+    destCoords = { lat: end.lat, lng: end.lng };
+    const result = await fetchAndDrawRoute(start.lat, start.lng, end.lat, end.lng, false);
+    if(!result){
+      routeStatus.textContent = currentT.routeErr;
+      routeStatus.className = 'routeStatus err';
+      return;
+    }
+
+    routeStatus.textContent = currentT.routeOk(result.count, result.km, result.minutes);
+    routeStatus.className = 'routeStatus active';
+    routeBadge.textContent = currentT.routeBadge(activeHazardKeys.size);
+    routeBadge.classList.add('show');
+    document.getElementById('clearRouteBtn').style.display = 'block';
+    if(!watchId){
+      const tb = document.getElementById('trackBtn');
+      tb.textContent = currentT.startNavLabel;
+      // Kurz aufblitzen lassen, damit klar ist: jetzt kann losgefahren werden
+      tb.classList.remove('confirmed');
+      void tb.offsetWidth;
+      tb.classList.add('confirmed');
+      vibrate(50);
+    }
+
+    announced = {};
+    hasGreetedThisSession = false;
+  } catch(e){
+    routeStatus.textContent = currentT.routeErr;
+    routeStatus.className = 'routeStatus err';
+  } finally {
+    document.getElementById('routeGoBtn').disabled = false;
+  }
+}
+
+document.getElementById('routeGoBtn').addEventListener('click', computeRoute);
+document.getElementById('useLocBtn').addEventListener('click', function(){
+  if(!navigator.geolocation){
+    showToast(currentT.locationErr);
+    return;
+  }
+  const fromEl = document.getElementById('fromInput');
+  const btn = this;
+  btn.textContent = '…';
+  fromEl.value = currentT.locating;
+  fromEl.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      myLocationCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      fromEl.value = currentT.myLocationLabel;
+      fromEl.disabled = false;
+      btn.textContent = '📍';
+      btn.classList.add('active');
+    },
+    err => {
+      showToast('⚠️ ' + currentT.locationErr);
+      fromEl.value = '';
+      fromEl.disabled = false;
+      btn.textContent = '📍';
+    },
+    {enableHighAccuracy:true, timeout:10000}
+  );
+});
+document.getElementById('fromInput').addEventListener('input', function(){
+  // Sobald von Hand getippt wird, den GPS-Standort-Modus wieder verlassen
+  myLocationCoords = null;
+  document.getElementById('useLocBtn').classList.remove('active');
+});
+setupAutocomplete('fromInput', 'fromSuggest', coords => {
+  myLocationCoords = coords;
+  document.getElementById('useLocBtn').classList.toggle('active', !!coords);
+});
+setupAutocomplete('toInput', 'toSuggest', coords => { toCoords = coords; });
+document.getElementById('clearRouteBtn').addEventListener('click', clearRoute);
+document.getElementById('toInput').addEventListener('keydown', e=>{ if(e.key==='Enter') computeRoute(); });
+document.getElementById('fromInput').addEventListener('keydown', e=>{ if(e.key==='Enter') computeRoute(); });
+
+applyLanguage();
+
+// ---- Willkommens-Bildschirm (Onboarding) ----
+function applyOnboardingLanguage(){
+  document.getElementById('obSubtitle').textContent = currentT.obSubtitle;
+  document.getElementById('obNameLabel').textContent = currentT.obNameLabel;
+  document.getElementById('obLangLabel').textContent = currentT.obLangLabel;
+  document.getElementById('obStartBtn').textContent = currentT.obStart;
+  document.getElementById('obHint').textContent = currentT.obHint;
+  document.getElementById('obStatusHead').textContent = currentT.obStatusHead;
+  renderIslandStatus();
+}
+
+// Zeigt auf dem Startbildschirm, was gerade auf der ganzen Insel gemeldet ist.
+function renderIslandStatus(){
+  const row = document.getElementById('obStatusRow');
+  if(!row) return;
+
+  // Nach Typ zaehlen
+  const counts = {};
+  hazards.forEach(h => { counts[h.type] = (counts[h.type] || 0) + 1; });
+  const total = hazards.length;
+
+  if(total === 0){
+    row.innerHTML = `<div class="obStatClear">✅ ${currentT.islandClear}</div>`;
+    return;
+  }
+
+  const order = ['blitzer','sperre','unfall','baustelle'];
+  const toneFor = { blitzer:'alert', sperre:'danger', unfall:'danger', baustelle:'warn' };
+  const iconFor = { blitzer:'📷', baustelle:'🚧', unfall:'⚠️', sperre:'⛔' };
+
+  row.innerHTML = order
+    .filter(t => counts[t])
+    .map(t => `<div class="obStatChip ${toneFor[t]}">
+        <div class="n">${counts[t]}</div>
+        <div class="l">${iconFor[t]} ${currentT.legend[typeIndex[t]]}</div>
+      </div>`)
+    .join('');
+}
+
+// Spricht die Lage einmal kurz an, sobald der Startbildschirm sichtbar ist
+function speakIslandBriefing(){
+  const counts = {};
+  hazards.forEach(h => { counts[h.type] = (counts[h.type] || 0) + 1; });
+  const total = hazards.length;
+
+  // Persoenlich ansprechen, wenn ein Name eingetragen wurde
+  const greet = greetPhrase();
+
+  if(total === 0){
+    speak(`${greet}, ${currentT.islandBriefClear} ${currentT.briefSignoff}`);
+    hasGreetedThisSession = true;
+    return;
+  }
+  const parts = Object.entries(counts)
+    .map(([t, n]) => `${n} ${currentT.legend[typeIndex[t]]}`);
+  speak(`${greet}, ${currentT.islandBrief.replace('{list}', parts.join(', '))} ${currentT.briefSignoff}`);
+  hasGreetedThisSession = true; // spaeter nicht nochmal mit Namen begruessen
+}
+
+applyOnboardingLanguage();
+
+document.getElementById('obLangSel').addEventListener('change', function(){
+  lang = this.value;
+  document.getElementById('langSel').value = lang;
+  applyLanguage();
+  applyOnboardingLanguage();
+});
+
+document.getElementById('obStartBtn').addEventListener('click', function(){
+  const obName = document.getElementById('obNameInput').value.trim();
+  if(obName) document.getElementById('nameInput').value = obName;
+  unlockSpeech();
+  speakIslandBriefing(); // kurze Lage-Ansage direkt beim Start
+  document.getElementById('onboarding').classList.add('hide');
+
+  // Karte jetzt erst laden - vorher wuerde sie im Hintergrund Kacheln ziehen
+  // und die Eingabe von Name/Sprache ausbremsen.
+  if(!map.hasLayer(streetLayer)) streetLayer.addTo(map);
+  map.invalidateSize();
+
+  // Standort-Verfolgung direkt starten, damit der Nutzer nicht noch extra tippen muss
+  document.getElementById('trackBtn').click();
+});
+</script>
+</body>
+</html>
