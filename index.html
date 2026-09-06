@@ -1024,7 +1024,7 @@ const ui = {
   }
 };
 
-const hazards = [
+let hazards = [
   { lat: 38.9067, lng: 1.4206, type: "blitzer", icon: "📷",
     original: "Radar móvil en Av. Isidor Macabich, sentido Marina",
     de: "Mobiler Blitzer auf der Av. Isidor Macabich, Richtung Marina",
@@ -1189,7 +1189,7 @@ function pinIcon(h, tier, dimmed){
     iconSize:[30,30], iconAnchor:[15,30]
   });
 }
-const hazardMarkers = hazards.map(h=>{
+let hazardMarkers = hazards.map(h=>{
   const marker = L.marker([h.lat,h.lng], {icon:pinIcon(h,null,false)})
     .addTo(map)
     .bindPopup(popupHtml(h));
@@ -1686,6 +1686,26 @@ function searchKnownPlaces(query){
     }))
     .slice(0, 4)
     .map(p => ({ lat:p.lat, lng:p.lng, main:p.label, sub:'Ibiza', icon:'📍' }));
+}
+
+
+// Sucht im Freitext (z.B. einer Telegram-Meldung) nach einem bekannten Ortsnamen
+// und gibt dessen Koordinaten zurueck - genutzt, um Live-Meldungen ohne eigene
+// Koordinaten automatisch auf der Karte zu platzieren.
+function findKnownPlaceInText(text){
+  if(!text) return null;
+  const q = text.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  let best = null, bestLen = 0;
+  knownPlaces.forEach(p=>{
+    p.names.forEach(n=>{
+      const clean = n.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if(clean.length > bestLen && q.includes(clean)){
+        best = p; bestLen = clean.length;
+      }
+    });
+  });
+  return best ? { lat: best.lat, lng: best.lng, label: best.label } : null;
 }
 
 async function geocode(query){
@@ -2641,6 +2661,53 @@ document.getElementById('obStartBtn').addEventListener('click', function(){
   // Standort-Verfolgung direkt starten, damit der Nutzer nicht noch extra tippen muss
   document.getElementById('trackBtn').click();
 });
+
+// ---- Live-Meldungen vom Telegram-Bot (GitHub) ----
+// Laedt echte Meldungen (Blitzer/Baustelle/Unfall/Sperre) und ordnet sie per
+// Ortsnamen-Erkennung automatisch einer Position zu. Meldungen ohne erkennbaren
+// Ort werden vorerst nicht auf der Karte angezeigt.
+const LIVE_HAZARDS_URL = 'https://raw.githubusercontent.com/jajayessin-gif/Ibiza-Radar-Data/main/hazards.json';
+const LIVE_ICON = { blitzer:'📷', baustelle:'🚧', unfall:'⚠️', sperre:'⛔' };
+
+async function loadLiveHazards(){
+  try {
+    const res = await fetch(LIVE_HAZARDS_URL + '?t=' + Date.now());
+    if(!res.ok) return;
+    const raw = await res.json();
+    if(!Array.isArray(raw)) return;
+
+    const placed = [];
+    raw.forEach(entry=>{
+      const type = entry.type;
+      if(!LIVE_ICON[type]) return; // unbekannter Typ - ueberspringen
+      const text = entry.text || '';
+      const place = findKnownPlaceInText(text);
+      if(!place) return; // kein bekannter Ort erkannt - vorerst nicht platzieren
+      placed.push({
+        lat: place.lat, lng: place.lng, type, icon: LIVE_ICON[type],
+        original: text, de: text, en: text, es: text, it: text, nl: text,
+        live: true
+      });
+    });
+
+    // Alte Marker entfernen und neu aufbauen
+    hazardMarkers.forEach(hm=>{ map.removeLayer(hm.marker); });
+    hazards = placed;
+    hazardMarkers = hazards.map(h=>{
+      const marker = L.marker([h.lat,h.lng], {icon:pinIcon(h,null,false)})
+        .addTo(map)
+        .bindPopup(popupHtml(h));
+      return {hazard:h, marker};
+    });
+
+    if(typeof renderIslandStatus === 'function') renderIslandStatus();
+  } catch(e){
+    console.error('Live-Meldungen konnten nicht geladen werden:', e);
+  }
+}
+
+loadLiveHazards();
+setInterval(loadLiveHazards, 90000);
 </script>
 </body>
 </html>
