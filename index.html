@@ -1153,10 +1153,10 @@ document.getElementById('earlyDistSel').addEventListener('change', function(){
 const map = L.map('map', {zoomControl:false}).setView([38.98, 1.43], 11);
 // Detaillierte Strassenkarte ueber CARTO (zuverlaessiger fuer oeffentlich eingebettete Seiten
 // als der offizielle OSM-Kachelserver, der Dauereinsatz auf fremden Webseiten oft blockt)
-const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap-Mitwirkende &copy; CARTO',
   maxZoom: 20,
-  subdomains: 'abcd'
+  subdomains: 'abc'
 }).addTo(map);
 // Satelliten-Ansicht fuer den Navigations-Modus (Esri World Imagery, oeffentlich nutzbar)
 const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -1170,10 +1170,10 @@ const labelsLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/ser
 });
 // Dunkle Navi-Karte: Umgebung tritt zurueck, die eigene Route sticht hervor -
 // angenehmer bei Nacht und lenkt den Blick auf das Wesentliche.
-const darkNavLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
+const darkNavLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap-Mitwirkende &copy; CARTO',
   maxZoom: 20,
-  subdomains: 'abcd'
+  subdomains: 'abc'
 });
 L.control.zoom({position:'bottomright'}).addTo(map);
 
